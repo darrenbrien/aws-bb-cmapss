@@ -1,3 +1,4 @@
+---
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Data Lake Foundation is a QuickStart that provides a Data Lake architecture,
   SageMaker in the same VPC through Cloudformation templates that provision
@@ -29,7 +30,6 @@ Metadata:
           default: AWS Quick Start Configuration
         Parameters:
           - QSS3BucketName
-          - QSS3BucketRegion
           - QSS3KeyPrefix
           - KeyPairName
     ParameterLabels:
@@ -41,8 +41,6 @@ Metadata:
         default: Remote Access CIDR
       QSS3BucketName:
         default: Quick Start S3 Bucket Name
-      QSS3BucketRegion:
-        default: Quick Start S3 bucket region
       QSS3KeyPrefix:
         default: Quick Start S3 Key Prefix
       VPCDefinition:
@@ -66,8 +64,6 @@ Mappings:
       PublicSubnet2CIDR: 10.0.144.0/20
       PrivateSubnet2CIDR: 10.0.32.0/19
       NumberOfAZs: '2'
-Conditions:
-  UsingDefaultBucket: !Equals [!Ref QSS3BucketName, 'aws-quickstart']
 Parameters:
   AvailabilityZones:
     Description: The list of Availability Zones to use for the subnets in the VPC.
@@ -92,27 +88,23 @@ Parameters:
       \ streaming data you\u2019d like to load."
     Type: String
   QSS3BucketName:
+    Default: aws-bb-darren-predictive-maintenance-capstone
     AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
     ConstraintDescription: Quick Start bucket name can include numbers, lowercase
       letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen
       (-).
-    Default: aws-quickstart
     Description: "S3 bucket where the Quick Start templates and scripts are installed.\
       \ Use this parameter to specify the S3 bucket name you\u2019ve created for your\
       \ copy of Quick Start assets, if you decide to customize or extend the Quick\
       \ Start for your own use. The bucket name can include numbers, lowercase letters,\
       \ uppercase letters, and hyphens, but should not start or end with a hyphen."
     Type: String
-  QSS3BucketRegion:
-    Default: 'us-east-1'
-    Description: 'The AWS Region where the Quick Start S3 bucket (QSS3BucketName) is hosted. When using your own bucket, you must specify this value.'
-    Type: String
   QSS3KeyPrefix:
     AllowedPattern: ^[0-9a-zA-Z-/]*$
     ConstraintDescription: Quick Start key prefix can include numbers, lowercase letters,
       uppercase letters, hyphens (-), and forward slash (/). It cannot start or end
       with forward slash (/) because they are automatically appended.
-    Default: quickstart-datalake-47lining/
+    Default: deployment
     Description: S3 key prefix used to simulate a folder for your copy of Quick Start
       assets, if you decide to customize or extend the Quick Start for your own use.
       This prefix can include numbers, lowercase letters, uppercase letters, hyphens,
@@ -178,7 +170,6 @@ Resources:
         PublicSubnet1ID: !GetAtt 'VPCStack.Outputs.PublicSubnet1ID'
         PublicSubnet2ID: !GetAtt 'VPCStack.Outputs.PublicSubnet2ID'
         QSS3BucketName: !Ref 'QSS3BucketName'
-        QSS3BucketRegion: !Ref 'QSS3BucketRegion'
         QSS3KeyPrefix: !Sub
           - ${Prefix}submodules/quickstart-linux-bastion/
           - Prefix: !Ref 'QSS3KeyPrefix'
@@ -186,9 +177,9 @@ Resources:
         VPCID: !GetAtt 'VPCStack.Outputs.VPCID'
       TemplateURL:
         !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}submodules/quickstart-linux-bastion/templates/linux-bastion.template'
-          - S3Region: !If [UsingDefaultBucket, !Ref 'AWS::Region', !Ref QSS3BucketRegion]
-            S3Bucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
+          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/linux-bastion.yaml'
+          - S3Region: !Ref 'AWS::Region'
+            S3Bucket: !Ref QSS3BucketName
     Type: AWS::CloudFormation::Stack
   DataLakeFoundationStack:
     Properties:
@@ -206,7 +197,6 @@ Resources:
         PublicSubnet1ID: !GetAtt 'VPCStack.Outputs.PublicSubnet1ID'
         PublicSubnet2ID: !GetAtt 'VPCStack.Outputs.PublicSubnet2ID'
         QSS3BucketName: !Ref 'QSS3BucketName'
-        QSS3BucketRegion: !Ref 'QSS3BucketRegion'
         QSS3KeyPrefix: !Ref 'QSS3KeyPrefix'
         RemoteAccessCIDR: !Ref 'RemoteAccessCIDR'
         VPCCIDR: !GetAtt 'VPCStack.Outputs.VPCCIDR'
@@ -216,9 +206,9 @@ Resources:
         NotebookTrainingInstanceType: !Ref 'NotebookTrainingInstanceType'
       TemplateURL:
         !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}templates/data-lake.yaml'
-          - S3Region: !If [UsingDefaultBucket, !Ref 'AWS::Region', !Ref QSS3BucketRegion]
-            S3Bucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
+          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/data-lake.yaml'
+          - S3Region: !Ref 'AWS::Region'
+            S3Bucket: !Ref QSS3BucketName
     Type: AWS::CloudFormation::Stack
   VPCStack:
     Properties:
@@ -253,9 +243,9 @@ Resources:
           - VPCCIDR
       TemplateURL:
         !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}submodules/quickstart-aws-vpc/templates/aws-vpc.template'
-          - S3Region: !If [UsingDefaultBucket, !Ref 'AWS::Region', !Ref QSS3BucketRegion]
-            S3Bucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
+          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/aws-vpc.template.yaml'
+          - S3Region: !Ref 'AWS::Region'
+            S3Bucket: !Ref QSS3BucketName
     Type: AWS::CloudFormation::Stack
 Outputs:
   SubmissionsBucketName:
