@@ -201,20 +201,14 @@ Resources:
   RandomStringStack:
     Properties:
       TemplateURL:
-        !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/random-string.yaml'
-          - S3Region: !Ref 'AWS::Region'
-            S3Bucket: !Ref QSS3BucketName
+        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/random-string.yaml'
     Type: AWS::CloudFormation::Stack
   BucketsStack:
     Properties:
       Parameters:
         RandomStringArn: !GetAtt 'RandomStringStack.Outputs.RandomStringArn'
       TemplateURL:
-        !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/buckets.yaml'
-          - S3Region: !Ref 'AWS::Region'
-            S3Bucket: !Ref QSS3BucketName
+        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/buckets.yaml'
     Type: AWS::CloudFormation::Stack
   IAMRolesStack:
     Properties:
@@ -226,10 +220,7 @@ Resources:
         RegionalLambdaBucketARN: !GetAtt 'BucketsStack.Outputs.RegionalLambdaBucketARN'
         SubmissionsBucketARN: !GetAtt 'BucketsStack.Outputs.SubmissionsBucketARN'
       TemplateURL:
-        !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/iam-roles.yaml'
-          - S3Region: !Ref 'AWS::Region'
-            S3Bucket: !Ref QSS3BucketName
+        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/iam-roles.yaml'
     Type: AWS::CloudFormation::Stack
   KinesisSampleStack:
     Properties:
@@ -240,18 +231,12 @@ Resources:
         KinesisStreamName: !Ref 'KinesisDataStreamName'
         RandomStringArn: !GetAtt 'RandomStringStack.Outputs.RandomStringArn'
       TemplateURL:
-        !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/kinesis.yaml'
-          - S3Region: !Ref 'AWS::Region'
-            S3Bucket: !Ref QSS3BucketName
+        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/kinesis.yaml'
     Type: AWS::CloudFormation::Stack
   GlueStack:
     Properties:
       TemplateURL:
-        !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/glue.yaml'
-          - S3Region: !Ref 'AWS::Region'
-            S3Bucket: !Ref QSS3BucketName
+        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/glue.yaml'
     Type: AWS::CloudFormation::Stack
   SageMakerStack:
     Properties:
@@ -262,11 +247,7 @@ Resources:
         CreateNotebookFunctionExecuteRoleArn: !GetAtt 'IAMRolesStack.Outputs.CreateNotebookFunctionExecuteRoleARN'
         SageMakerExecutionRoleArn: !GetAtt 'IAMRolesStack.Outputs.SageMakerExecutionRoleARN'
       TemplateURL:
-        !Sub
-          - 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/sagemaker.yaml'
-          - S3Region: !Ref 'AWS::Region'
-            S3Bucket: !Ref QSS3BucketName
-            S3Bucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
+        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/sagemaker.yaml'
     Type: AWS::CloudFormation::Stack
 Outputs:
   SubmissionsBucketName:

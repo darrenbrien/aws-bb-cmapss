@@ -532,22 +532,13 @@ Resources:
                 -a exit,always -F arch=b64 -S execve
                 -a exit,always -F arch=b32 -S execve
             /tmp/auditing_configure.sh:
-              source: !Sub
-                - https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/scripts/auditing_configure.sh
-                - S3Region: !Ref 'AWS::Region'
-                  S3Bucket: !Ref QSS3BucketName
+              source: !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/scripts/auditing_configure.sh'
               mode: '000550'
               owner: root
               group: root
               authentication: S3AccessCreds
             /tmp/bastion_bootstrap.sh:
-              source: !If
-                - UseAlternativeInitialization
-                - !Ref AlternativeInitializationScript
-                - !Sub
-                  - https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/scripts/bastion_bootstrap.sh
-                  - S3Region: !Ref 'AWS::Region'
-                    S3Bucket: !Ref QSS3BucketName
+              source: !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/scripts/bastion_bootstrap.sh'
               mode: '000550'
               owner: root
               group: root
