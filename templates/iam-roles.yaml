@@ -1,51 +1,50 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: AWS CloudFormation template to create IAM roles. (qs-1nlkhq1oj)
 Resources:
-  CopyLambdaDeploymentRole:
+  GlueJobRole:
+    Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
+        Version: '2012-10-17'
         Statement:
-          - Action:
-              - sts:AssumeRole
-            Effect: Allow
+          - Effect: Allow
             Principal:
               Service:
-                - lambda.amazonaws.com
-        Version: '2012-10-17'
+                - glue.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Policies:
-        - PolicyDocument:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
             Statement:
-              - Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Effect: Allow
-                Resource: arn:aws:logs:*:*:*
-            Version: '2012-10-17'
-          PolicyName: LambdaLogging
-        - PolicyDocument:
-            Statement:
-              - Action:
-                  - s3:PutObject
-                  - s3:DeleteObject
-                Effect: Allow
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
                 Resource:
                   - !Join
                     - ''
-                    - - !Ref 'RegionalLambdaBucketARN'
+                    - - !Ref 'SubmissionsBucketARN'
                       - /*
-            Version: '2012-10-17'
-          PolicyName: PutDeleteRegionalLambdaBucket
-        - PolicyDocument:
-            Statement:
-              - Action:
-                  - s3:ListBucket
+              - Effect: Allow
+                Action:
                   - s3:GetObject
-                Effect: Allow
-                Resource: "*"
-            Version: '2012-10-17'
-          PolicyName: ListGetQSSBucket
-    Type: AWS::IAM::Role
+                  - s3:ListBucket
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Join
+                    - ''
+                    - - !Ref 'PublishedDataARN'
+                      - /*
+                  - !Join
+                    - ''
+                    - - !Ref 'CuratedDatasetsARN'
+                      - /*
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Path: "/"
   KinesisStreamBucketRole:
     Properties:
       AssumeRolePolicyDocument:
@@ -195,64 +194,12 @@ Resources:
                   - s3:ListAllMyBuckets
                   - s3:HeadBucket
                 Resource: '*'
-  CreateNotebookFunctionExecuteRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Path: /
-      Policies:
-        - PolicyName: CreateNotebookFunctionPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:*
-              - Effect: Allow
-                Action:
-                  - sagemaker:*
-                Resource: '*'
-              - Effect: Allow
-                Action:
-                  - iam:PassRole
-                Resource: !GetAtt 'SageMakerExecutionRole.Arn'
-              - Effect: Allow
-                Action:
-                  - ec2:*
-                Resource: '*'
-              - Effect: Allow
-                Action:
-                  - s3:*
-                Resource:
-                  - !Sub 'arn:aws:s3:::${QSS3BucketName}*'
-Conditions:
-  UsingDefaultBucket: !Equals [!Ref QSS3BucketName, 'aws-quickstart']
 Parameters:
   CuratedDatasetsARN:
     Description: CuratedDatasets bucket ARN
     Type: String
   PublishedDataARN:
     Description: PublishedData bucket ARN
-    Type: String
-  QSS3BucketName:
-    Description: Quick Start S3 bucket name
-    Type: String
-  QSS3BucketRegion:
-    Description: Quick Start S3 bucket region
-    Type: String
-  RegionalLambdaBucketARN:
-    Description: RegionalLambdaBucket bucket ARN
     Type: String
   SubmissionsBucketARN:
     Description: SubmissionsBucket bucket ARN
@@ -261,15 +208,9 @@ Outputs:
   LambdaRoleARN:
     Description: ARN of LambdaRole
     Value: !GetAtt 'LambdaRole.Arn'
-  CopyLambdaDeploymentRoleARN:
-    Description: ARN of CopyLambdaDeploymentRole
-    Value: !GetAtt 'CopyLambdaDeploymentRole.Arn'
   KinesisStreamBucketRoleARN:
     Description: ARN of KinesisStreamBucketRole
     Value: !GetAtt 'KinesisStreamBucketRole.Arn'
   SageMakerExecutionRoleARN:
     Description: Sage Maker Execution Role ARN
     Value: !GetAtt 'SageMakerExecutionRole.Arn'
-  CreateNotebookFunctionExecuteRoleARN:
-    Description: Sage Maker Execution Role ARN
-    Value: !GetAtt 'CreateNotebookFunctionExecuteRole.Arn'

@@ -29,8 +29,6 @@ Metadata:
       - Label:
           default: AWS Quick Start Configuration
         Parameters:
-          - QSS3BucketName
-          - QSS3KeyPrefix
           - KeyPairName
     ParameterLabels:
       AvailabilityZones:
@@ -39,10 +37,6 @@ Metadata:
         default: Key Pair Name
       RemoteAccessCIDR:
         default: Remote Access CIDR
-      QSS3BucketName:
-        default: Quick Start S3 Bucket Name
-      QSS3KeyPrefix:
-        default: Quick Start S3 Key Prefix
       VPCDefinition:
         default: VPC Definition
       KinesisDataStreamName:
@@ -86,29 +80,6 @@ Parameters:
       \ hyphens, and forward slashes, but should not start with a forward slash, which\
       \ is automatically added. Use this parameter to specify the location for the\
       \ streaming data you\u2019d like to load."
-    Type: String
-  QSS3BucketName:
-    Default: aws-bb-darren-predictive-maintenance-capstone
-    AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
-    ConstraintDescription: Quick Start bucket name can include numbers, lowercase
-      letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen
-      (-).
-    Description: "S3 bucket where the Quick Start templates and scripts are installed.\
-      \ Use this parameter to specify the S3 bucket name you\u2019ve created for your\
-      \ copy of Quick Start assets, if you decide to customize or extend the Quick\
-      \ Start for your own use. The bucket name can include numbers, lowercase letters,\
-      \ uppercase letters, and hyphens, but should not start or end with a hyphen."
-    Type: String
-  QSS3KeyPrefix:
-    AllowedPattern: ^[0-9a-zA-Z-/]*$
-    ConstraintDescription: Quick Start key prefix can include numbers, lowercase letters,
-      uppercase letters, hyphens (-), and forward slash (/). It cannot start or end
-      with forward slash (/) because they are automatically appended.
-    Default: deployments
-    Description: S3 key prefix used to simulate a folder for your copy of Quick Start
-      assets, if you decide to customize or extend the Quick Start for your own use.
-      This prefix can include numbers, lowercase letters, uppercase letters, hyphens,
-      and forward slashes.
     Type: String
   RemoteAccessCIDR:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
@@ -169,14 +140,9 @@ Resources:
         KeyPairName: !Ref 'KeyPairName'
         PublicSubnet1ID: !GetAtt 'VPCStack.Outputs.PublicSubnet1ID'
         PublicSubnet2ID: !GetAtt 'VPCStack.Outputs.PublicSubnet2ID'
-        QSS3BucketName: !Ref 'QSS3BucketName'
-        QSS3KeyPrefix: !Sub
-          - ${Prefix}submodules/quickstart-linux-bastion/
-          - Prefix: !Ref 'QSS3KeyPrefix'
         RemoteAccessCIDR: !Ref 'RemoteAccessCIDR'
         VPCID: !GetAtt 'VPCStack.Outputs.VPCID'
-      TemplateURL:
-        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/linux-bastion.yaml'
+      TemplateURL: linux-bastion.yaml
     Type: AWS::CloudFormation::Stack
   DataLakeFoundationStack:
     Properties:
@@ -193,16 +159,13 @@ Resources:
         PrivateSubnet2ID: !GetAtt 'VPCStack.Outputs.PrivateSubnet2AID'
         PublicSubnet1ID: !GetAtt 'VPCStack.Outputs.PublicSubnet1ID'
         PublicSubnet2ID: !GetAtt 'VPCStack.Outputs.PublicSubnet2ID'
-        QSS3BucketName: !Ref 'QSS3BucketName'
-        QSS3KeyPrefix: !Ref 'QSS3KeyPrefix'
         RemoteAccessCIDR: !Ref 'RemoteAccessCIDR'
         VPCCIDR: !GetAtt 'VPCStack.Outputs.VPCCIDR'
         VPCID: !GetAtt 'VPCStack.Outputs.VPCID'
         NotebookInstanceName: !Ref 'NotebookInstanceName'
         NotebookInstanceType: !Ref 'NotebookInstanceType'
         NotebookTrainingInstanceType: !Ref 'NotebookTrainingInstanceType'
-      TemplateURL:
-        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/data-lake.yaml'
+      TemplateURL: data-lake.yaml
     Type: AWS::CloudFormation::Stack
   VPCStack:
     Properties:
@@ -235,8 +198,7 @@ Resources:
           - VPCDefinitions
           - !Ref 'VPCDefinition'
           - VPCCIDR
-      TemplateURL:
-        !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/aws-vpc.template.yaml'
+      TemplateURL: aws-vpc.template.yaml
     Type: AWS::CloudFormation::Stack
 Outputs:
   SubmissionsBucketName:
@@ -251,6 +213,6 @@ Outputs:
   KinesisDataStreamName:
     Description: Kinesis data stream name
     Value: !GetAtt 'DataLakeFoundationStack.Outputs.KinesisDataStreamName'
-  SageMakerNotebookURL:
-    Description: SageMaker Notebook Instance URL
-    Value: !GetAtt 'DataLakeFoundationStack.Outputs.SageMakerNotebookURL'
+  NotebookInstanceId:
+    Description: SageMaker Notebook Id
+    Value: !GetAtt 'DataLakeFoundationStack.Outputs.NotebookInstanceId'

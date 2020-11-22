@@ -36,8 +36,8 @@ Resources:
           - - "arn:aws:s3:::"
             - !Ref "KinesisStreamBucketName"
         BufferingHints:
-          IntervalInSeconds: 60
-          SizeInMBs: 60
+          IntervalInSeconds: 600
+          SizeInMBs: 100
         CompressionFormat: UNCOMPRESSED
         Prefix: !Join
           - ""

@@ -24,8 +24,6 @@ Metadata:
           - NumBastionHosts
           - BastionHostName
           - BastionTenancy
-          - EnableBanner
-          - BastionBanner
           - EnableTCPForwarding
           - EnableX11Forwarding
       - Label:
@@ -35,12 +33,6 @@ Metadata:
           - OSImageOverride
           - AlternativeIAMRole
           - EnvironmentVariables
-      - Label:
-          default: AWS Quick Start configuration
-        Parameters:
-          - QSS3BucketName
-          - QSS3KeyPrefix
-          - QSS3BucketRegion
     ParameterLabels:
       AlternativeIAMRole:
         default: Alternative IAM role
@@ -52,14 +44,8 @@ Metadata:
         default: Bastion Host Name
       BastionTenancy:
         default: Bastion tenancy
-      BastionBanner:
-        default: Banner text
-      QSS3BucketRegion:
-        default: Quick Start S3 bucket region
       BastionInstanceType:
         default: Bastion instance type
-      EnableBanner:
-        default: Bastion banner
       EnableTCPForwarding:
         default: TCP forwarding
       EnableX11Forwarding:
@@ -76,10 +62,6 @@ Metadata:
         default: Public subnet 1 ID
       PublicSubnet2ID:
         default: Public subnet 2 ID
-      QSS3BucketName:
-        default: Quick Start S3 bucket name
-      QSS3KeyPrefix:
-        default: Quick Start S3 key prefix
       RemoteAccessCIDR:
         default: Allowed bastion external access CIDR
       VPCID:
@@ -100,10 +82,6 @@ Parameters:
   BastionHostName:
     Default: 'LinuxBastion'
     Description: The value used for the name tag of the bastion host
-    Type: String
-  BastionBanner:
-    Default: ""
-    Description: Banner text to display upon login.
     Type: String
   BastionTenancy:
     Description: 'VPC tenancy to launch the bastion in. Options: ''dedicated'' or ''default'''
@@ -131,14 +109,6 @@ Parameters:
       - m4.4xlarge
     Default: t2.micro
     Description: Amazon EC2 instance type for the bastion instances.
-    Type: String
-  EnableBanner:
-    AllowedValues:
-      - 'true'
-      - 'false'
-    Default: 'false'
-    Description: To include a banner to be displayed when connecting via SSH to the
-      bastion, choose true.
     Type: String
   EnableTCPForwarding:
     Type: String
@@ -175,29 +145,6 @@ Parameters:
     Description: ID of the public subnet 2 that you want to provision the second bastion into
       (e.g., subnet-e3246d8e).
     Type: 'AWS::EC2::Subnet::Id'
-  QSS3BucketName:
-    AllowedPattern: '^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$'
-    ConstraintDescription: Quick Start bucket name can include numbers, lowercase letters, uppercase
-      letters, and hyphens (-). It cannot start or end with a hyphen (-).
-    Default: aws-quickstart
-    Description: S3 bucket name for the Quick Start assets. Quick Start bucket name can
-      include numbers, lowercase letters, uppercase letters, and hyphens (-). It
-      cannot start or end with a hyphen (-).
-    Type: String
-  QSS3BucketRegion:
-    Default: 'us-east-1'
-    Description: The AWS Region where the Quick Start S3 bucket (QSS3BucketName) is hosted. When using your own bucket, you must specify this value.
-    Type: String
-  QSS3KeyPrefix:
-    AllowedPattern: '^([0-9a-zA-Z-.]+/)*$'
-    ConstraintDescription: Quick Start key prefix can include numbers, lowercase letters, uppercase
-      letters, hyphens (-), dots (.) and forward slash (/). The prefix should
-      end with a forward slash (/).
-    Default: quickstart-linux-bastion/
-    Description: S3 key prefix for the Quick Start assets. Quick Start key prefix can
-      include numbers, lowercase letters, uppercase letters, hyphens (-), dots
-      (.) and forward slash (/) and it should end with a forward slash (/).
-    Type: String
   RemoteAccessCIDR:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/x
@@ -389,10 +336,6 @@ Conditions:
     - !Equals
       - !Ref OSImageOverride
       - ''
-  UsingDefaultBucket: !Equals
-    - !Ref QSS3BucketName
-    - 'aws-quickstart'
-  DefaultBanner: !Equals [!Ref BastionBanner, ""]
 Resources:
   BastionMainLogGroup:
     Type: 'AWS::Logs::LogGroup'
@@ -429,12 +372,6 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Action:
-              - 's3:GetObject'
-            Resource: !Sub
-              - arn:${AWS::Partition}:s3:::${S3Bucket}/${QSS3KeyPrefix}*
-              - S3Bucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
-            Effect: Allow
           - Action:
               - 'logs:CreateLogStream'
               - 'logs:GetLogEvents'
@@ -512,15 +449,6 @@ Resources:
   BastionLaunchConfiguration:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
-      'AWS::CloudFormation::Authentication':
-        S3AccessCreds:
-          type: S3
-          roleName: !If
-            - CreateIAMRole
-            - !Ref BastionHostRole
-            - !Ref AlternativeIAMRole
-          buckets:
-            - !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
       'AWS::CloudFormation::Init':
         config:
           files:
@@ -532,13 +460,13 @@ Resources:
                 -a exit,always -F arch=b64 -S execve
                 -a exit,always -F arch=b32 -S execve
             /tmp/auditing_configure.sh:
-              source: !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/scripts/auditing_configure.sh'
+              source: https://raw.githubusercontent.com/aws-quickstart/quickstart-linux-bastion/main/scripts/auditing_configure.sh 
               mode: '000550'
               owner: root
               group: root
               authentication: S3AccessCreds
             /tmp/bastion_bootstrap.sh:
-              source: !Sub 'https://${QSS3BucketName}.s3.${AWS::Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}/templates/scripts/bastion_bootstrap.sh'
+              source: https://raw.githubusercontent.com/aws-quickstart/quickstart-linux-bastion/main/scripts/bastion_bootstrap.sh
               mode: '000550'
               owner: root
               group: root
@@ -557,15 +485,7 @@ Resources:
               env:
                 REGION: !Sub ${AWS::Region}
                 URL_SUFFIX: !Sub ${AWS::URLSuffix}
-                BANNER_REGION: !If [ UsingDefaultBucket, !Ref 'AWS::Region', !Ref 'QSS3BucketRegion' ]
-              command: !Sub
-                - "./bastion_bootstrap.sh --banner ${BannerUrl} --enable ${EnableBanner} --tcp-forwarding ${EnableTCPForwarding} --x11-forwarding ${EnableX11Forwarding}"
-                - BannerUrl: !If
-                  - DefaultBanner
-                  - !Sub
-                    - s3://${S3Bucket}/${QSS3KeyPrefix}scripts/banner_message.txt
-                    - S3Bucket: !If [ UsingDefaultBucket, !Sub 'aws-quickstart-${AWS::Region}', !Ref 'QSS3BucketName' ]
-                  - !Ref BastionBanner
+              command: !Sub "./bastion_bootstrap.sh --tcp-forwarding ${EnableTCPForwarding} --x11-forwarding ${EnableX11Forwarding}"
     Properties:
       AssociatePublicIpAddress: true
       PlacementTenancy: !Ref BastionTenancy
