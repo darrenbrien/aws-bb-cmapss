@@ -2,7 +2,6 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description:
   AWS CloudFormation templates to create S3 buckets. **WARNING** You will
   be billed for data stored in AWS S3 buckets if you create a stack from this template.
-  (qs-1nlkhq1nj)
 Parameters:
   RandomStringArn:
     Description: 'The ARN for the function that will generate the random value to be used in the naming of the S3 Buckets'
@@ -155,17 +154,6 @@ Resources:
                         - !Sub ${RandomString}
       Topics:
         - !Ref "SubmissionsTopic"
-  RegionalLambdaBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Join
-        - "-"
-        - - regional
-          - lambda
-          - bucket
-          - !Ref "AWS::AccountId"
-          - !Ref "AWS::Region"
-          - !Sub ${RandomString}
   AthenaQueryResultsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -206,15 +194,6 @@ Outputs:
   PublishedBucketName:
     Value: !Ref "PublishedData"
     Description: Bucket name for published results
-  RegionalLambdaBucketARN:
-    Value: !Join
-      - ""
-      - - "arn:aws:s3:::"
-        - !Ref "RegionalLambdaBucket"
-    Description: RegionalLambdaBucket bucket ARN
-  RegionalLambdaBucketName:
-    Value: !Ref "RegionalLambdaBucket"
-    Description: RegionalLambdaBucket bucket name
   AthenaQueryResultsBucketARN:
     Value: !Join
       - ""

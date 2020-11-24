@@ -1,6 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Creates AWS Glue resources.  **WARNING**  You will be billed for the
   AWS resources used if you create a stack from this template.
+Parameters:
+  KinesisStreamBucketName:
+    Description: Kinesis stream bucket name
+    Type: String
+  KinesisStreamKeyPrefix:
+    Type: String
+  GlueJobRole:
+    Description: glue job role ARN
+    Type: String
 Resources:
   DatalakeSubmissionsDatabase:
     Type: AWS::Glue::Database
@@ -16,6 +25,45 @@ Resources:
       DatabaseInput:
         Name: datalake-curated-datasets
         Description: Data Lake Quick Start Curated Datasets
+  CMAPSSClassifier:
+    Type: AWS::Glue::Classifier
+    Properties:
+      CsvClassifier:
+        AllowSingleColumn: false
+        ContainsHeader: ABSENT
+        Delimiter: ' '
+        Name: cmapss_classify
+        QuoteSymbol: '"'
+  CMAPSSSubmissions:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: "CMAPSS_submissions"
+      Role: !Ref GlueJobRole
+      DatabaseName: !Ref DatalakeSubmissionsDatabase
+      Classifiers:
+        - !Ref CMAPSSClassifier
+      Targets:
+        S3Targets:
+          - Path: !Join
+            - "/"
+            - - !Ref "KinesisStreamBucketName"
+              - !Ref "KinesisStreamKeyPrefix"
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "LOG"
+  CMAPSSJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Command:
+        Name: glueetl
+        ScriptLocation: "../src/glue_job.py"
+      DefaultArguments:
+        "--job-bookmark-option": "job-bookmark-enable"
+      ExecutionProperty:
+        MaxConcurrentRuns: 2
+      MaxRetries: 0
+      Name: calc_rul
+      Role: !Ref GlueJobRole
 Outputs:
   CuratedDatasetsDatabaseName:
     Value: !Ref 'CuratedDatasetsDatabase'

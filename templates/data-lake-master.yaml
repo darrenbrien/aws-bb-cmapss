@@ -117,7 +117,7 @@ Parameters:
       - ml.t2.medium
       - ml.t2.large
       - ml.t2.xlarge
-    Default: ml.t2.large
+    Default: ml.t2.medium
   NotebookTrainingInstanceType:
     Description: The EC2 instance type for the Amazon SageMaker training instance which will be used for model training.
     ConstraintDescription: Must select a valid Notebook instance type.
@@ -131,7 +131,7 @@ Parameters:
       - ml.c5.2xlarge
       - ml.c5.4xlarge
       - ml.c5.9xlarge
-    Default: ml.m5.xlarge
+    Default: ml.m5.large
 Resources:
   BastionStack:
     Properties:

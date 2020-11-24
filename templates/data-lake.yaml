@@ -144,7 +144,7 @@ Parameters:
       - ml.t2.medium
       - ml.t2.large
       - ml.t2.xlarge
-    Default: ml.t2.large
+    Default: ml.t2.medium
   NotebookTrainingInstanceType:
     Description: The EC2 instance type for the Amazon SageMaker training instance which will be used for model training.
     ConstraintDescription: Must select a valid Notebook instance type.
@@ -158,7 +158,7 @@ Parameters:
       - ml.c5.2xlarge
       - ml.c5.4xlarge
       - ml.c5.9xlarge
-    Default: ml.m5.xlarge
+    Default: ml.m5.large
 Resources:
   RandomStringStack:
     Properties:
@@ -175,7 +175,6 @@ Resources:
       Parameters:
         CuratedDatasetsARN: !GetAtt 'BucketsStack.Outputs.CuratedDatasetsARN'
         PublishedDataARN: !GetAtt 'BucketsStack.Outputs.PublishedDataARN'
-        RegionalLambdaBucketARN: !GetAtt 'BucketsStack.Outputs.RegionalLambdaBucketARN'
         SubmissionsBucketARN: !GetAtt 'BucketsStack.Outputs.SubmissionsBucketARN'
       TemplateURL: iam-roles.yaml
     Type: AWS::CloudFormation::Stack
@@ -191,6 +190,10 @@ Resources:
     Type: AWS::CloudFormation::Stack
   GlueStack:
     Properties:
+      Parameters:
+        KinesisStreamBucketName: !GetAtt 'BucketsStack.Outputs.SubmissionsBucketName'
+        KinesisStreamKeyPrefix: !Ref 'KinesisDataStreamS3Prefix'
+        GlueJobRole: !GetAtt 'IAMRolesStack.Outputs.GlueJobRole'
       TemplateURL: glue.yaml
     Type: AWS::CloudFormation::Stack
   SageMakerStack:
@@ -224,10 +227,6 @@ Outputs:
     Value: !GetAtt 'BucketsStack.Outputs.CuratedDatasetsARN'
   BucketsStackPublishedDataARN:
     Value: !GetAtt 'BucketsStack.Outputs.PublishedDataARN'
-  BucketsStackRegionalLambdaBucketARN:
-    Value: !GetAtt 'BucketsStack.Outputs.RegionalLambdaBucketARN'
-  RegionalLambdaBucketName:
-    Value: !GetAtt 'BucketsStack.Outputs.RegionalLambdaBucketName'
   BucketsStackSubmissionsBucketARN:  # used in Kinesis Demonstration and WebApp too
     Value: !GetAtt 'BucketsStack.Outputs.SubmissionsBucketARN'
   CuratedDatasetsDatabaseName:

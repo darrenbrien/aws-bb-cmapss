@@ -205,6 +205,9 @@ Parameters:
     Description: SubmissionsBucket bucket ARN
     Type: String
 Outputs:
+  GlueJobRole:
+    Description: ARN of GlueRole
+    Value: !GetAtt 'GlueJobRole.Arn'
   LambdaRoleARN:
     Description: ARN of LambdaRole
     Value: !GetAtt 'LambdaRole.Arn'
