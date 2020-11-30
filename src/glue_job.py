@@ -85,33 +85,15 @@ results_df = (
     .max("cycle")
     .withColumnRenamed("max(cycle)", "failure_cycle")
 )
-results_dyf = DynamicFrame.fromDF(results_df, glueContext, "results_dyf")
 
-joined = Join.apply(
-    dropnullfields3,
-    results_dyf,
-    ["unit_number"],
-    ["unit_number"],
-    transformation_ctx="joined",
-)
+joined = results_df.join(df, ["unit_number"])
 
-rul_df = joined.toDF()
-rul_df = rul_df.withColumn("failure_cycle", rul_df["failure_cycle"] - rul_df["cycle"])
+rul_df = joined.withColumn("failure_cycle", joined["failure_cycle"] - joined["cycle"])
 
 final = DynamicFrame.fromDF(rul_df, glueContext, "final")
 
-
-sink = glueContext.getSink(
-    connection_type="s3",
-    path="s3://datalake-curated-datasets-907317471167-us-east-1-dj2y7u4/cmapss",
-    enableUpdateCatalog=True,
-    updateBehavior="UPDATE_IN_DATABASE",
-    partitionKeys=["year", "month", "day", "hour"],
+glueContext.write_dynamic_frame.from_catalog(
+    connection_type="s3", namespace="datalake-curated-datasets", table_name="cmapss-rul"
 )
-sink.setFormat("glueparquet")
-sink.setCatalogInfo(
-    catalogDatabase="datalake-curated-datasets", catalogTableName="cmapss-RUL"
-)
-sink.writeFrame(final)
 
 job.commit()

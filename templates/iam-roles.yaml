@@ -23,6 +23,12 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
+                  - 'arn:aws:s3:::aws-bb-darren-predictive-maintenance-capstone/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
                   - !Join
                     - ''
                     - - !Ref 'SubmissionsBucketARN'

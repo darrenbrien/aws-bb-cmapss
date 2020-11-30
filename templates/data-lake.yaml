@@ -160,6 +160,11 @@ Parameters:
       - ml.c5.9xlarge
     Default: ml.m5.large
 Resources:
+  Cloud9Environment:
+    Properties:
+      InstanceType: t2.micro
+      SubnetId: !Ref PublicSubnet1ID
+    Type: AWS::Cloud9::EnvironmentEC2
   RandomStringStack:
     Properties:
       TemplateURL: random-string.yaml
