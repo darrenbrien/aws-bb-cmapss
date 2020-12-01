@@ -32,13 +32,7 @@ Metadata:
           - NotebookInstanceName
           - NotebookInstanceType
           - NotebookTrainingInstanceType
-      - Label:
-          default: AWS Quick Start Configuration
-        Parameters:
-          - KeyPairName
     ParameterLabels:
-      KeyPairName:
-        default: Key Pair Name
       RemoteAccessCIDR:
         default: Remote Access CIDR
       PrivateSubnet1ID:
@@ -71,17 +65,13 @@ Parameters:
   AvailabilityZones:
     Description: The list of Availability Zones to use for the subnets in the VPC. You must specify two Availability Zones. By default, the Quick Start preserves the logical order you specify.
     Type: List<AWS::EC2::AvailabilityZone::Name>
-  KeyPairName:
-    Description: Public/private key pairs allow you to securely connect to your instance
-      after it launches
-    Type: AWS::EC2::KeyPair::KeyName
   KinesisDataStreamName:
-    Default: streaming-submissions
+    Default: streaming_submissions
     Description: "Name of the Kinesis data stream."
     Type: String
   KinesisDataStreamS3Prefix:
-    AllowedPattern: ^[0-9a-zA-Z-]+(/[0-9a-zA-Z-]+)*$
-    Default: streaming-submissions
+    AllowedPattern: ^[0-9a-zA-Z-_]+(/[0-9a-zA-Z-_]+)*$
+    Default: streaming_submissions
     Description: "S3 key prefix for your streaming data stored in the S3 submissions\
       \ bucket. This prefix can include numbers, lowercase letters, uppercase letters,\
       \ hyphens, and forward slashes, but should not start with a forward slash, which\
@@ -199,6 +189,7 @@ Resources:
         KinesisStreamBucketName: !GetAtt 'BucketsStack.Outputs.SubmissionsBucketName'
         KinesisStreamKeyPrefix: !Ref 'KinesisDataStreamS3Prefix'
         GlueJobRole: !GetAtt 'IAMRolesStack.Outputs.GlueJobRole'
+        CuratedBucketName: !GetAtt 'BucketsStack.Outputs.CuratedBucketName'
       TemplateURL: glue.yaml
     Type: AWS::CloudFormation::Stack
   SageMakerStack:
@@ -206,7 +197,6 @@ Resources:
       Parameters:
         NotebookInstanceName: !Ref 'NotebookInstanceName'
         NotebookInstanceType: !Ref 'NotebookInstanceType'
-        # SubnetId: !Ref 'PrivateSubnet1ID'
         SageMakerExecutionRoleArn: !GetAtt 'IAMRolesStack.Outputs.SageMakerExecutionRoleARN'
       TemplateURL: sagemaker.yaml
     Type: AWS::CloudFormation::Stack

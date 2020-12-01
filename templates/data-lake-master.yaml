@@ -28,13 +28,9 @@ Metadata:
           - NotebookTrainingInstanceType
       - Label:
           default: AWS Quick Start Configuration
-        Parameters:
-          - KeyPairName
     ParameterLabels:
       AvailabilityZones:
         default: Availability Zones
-      KeyPairName:
-        default: Key Pair Name
       RemoteAccessCIDR:
         default: Remote Access CIDR
       VPCDefinition:
@@ -64,17 +60,13 @@ Parameters:
       You must specify two Availability Zones. By default, the Quick Start preserves
       the logical order you specify.
     Type: List<AWS::EC2::AvailabilityZone::Name>
-  KeyPairName:
-    Description: Public/private key pairs allow you to securely connect to your instance
-      after it launches
-    Type: AWS::EC2::KeyPair::KeyName
   KinesisDataStreamName:
-    Default: streaming-submissions
+    Default: streaming_submissions
     Description: "Name of the Kinesis data stream."
     Type: String
   KinesisDataStreamS3Prefix:
-    AllowedPattern: ^[0-9a-zA-Z-]+(/[0-9a-zA-Z-]+)*$
-    Default: streaming-submissions
+    AllowedPattern: ^[0-9a-zA-Z-_]+(/[0-9a-zA-Z-_]+)*$
+    Default: streaming_submissions
     Description: "S3 key prefix for your streaming data stored in the S3 submissions\
       \ bucket. This prefix can include numbers, lowercase letters, uppercase letters,\
       \ hyphens, and forward slashes, but should not start with a forward slash, which\
@@ -138,7 +130,6 @@ Resources:
     Properties:
       Parameters:
         EnableTCPForwarding: 'true'
-        KeyPairName: !Ref 'KeyPairName'
         PublicSubnet1ID: !GetAtt 'VPCStack.Outputs.PublicSubnet1ID'
         PublicSubnet2ID: !GetAtt 'VPCStack.Outputs.PublicSubnet2ID'
         RemoteAccessCIDR: !Ref 'RemoteAccessCIDR'
@@ -151,7 +142,6 @@ Resources:
         AvailabilityZones: !Join
           - ','
           - !Ref 'AvailabilityZones'
-        KeyPairName: !Ref 'KeyPairName'
         KinesisDataStreamName: !Ref 'KinesisDataStreamName'
         KinesisDataStreamS3Prefix: !Ref 'KinesisDataStreamS3Prefix'
         NAT1ElasticIP: !GetAtt 'VPCStack.Outputs.NAT1EIP'
@@ -174,7 +164,6 @@ Resources:
         AvailabilityZones: !Join
           - ','
           - !Ref 'AvailabilityZones'
-        KeyPairName: !Ref 'KeyPairName'
         NumberOfAZs: !FindInMap
           - VPCDefinitions
           - !Ref 'VPCDefinition'

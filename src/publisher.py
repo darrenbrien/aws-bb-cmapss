@@ -9,7 +9,7 @@ if __name__ == "__main__":
     batchsize = 500
     res = client.list_delivery_streams()
     streamname, *b = [
-        i for i in res["DeliveryStreamNames"] if i.startswith("streaming-submissions-")
+        i for i in res["DeliveryStreamNames"] if i.startswith("streaming_submissions-")
     ]
     batch = []
     for filename in glob.glob(sys.argv[1]):

@@ -14,7 +14,6 @@ Metadata:
       - Label:
           default: Amazon EC2 configuration
         Parameters:
-          - KeyPairName
           - BastionAMIOS
           - BastionInstanceType
           - RootVolumeSize
@@ -52,8 +51,6 @@ Metadata:
         default: X11 forwarding
       EnvironmentVariables:
         default: Environment variables
-      KeyPairName:
-        default: Key pair name
       NumBastionHosts:
         default: Number of bastion hosts
       OSImageOverride:
@@ -124,10 +121,6 @@ Parameters:
     AllowedValues:
       - 'true'
       - 'false'
-  KeyPairName:
-    Description: Name of an existing public/private key pair. If you do not have one in this AWS Region,
-      please create it before continuing.
-    Type: 'AWS::EC2::KeyPair::KeyName'
   NumBastionHosts:
     AllowedValues:
       - '1'
@@ -489,7 +482,6 @@ Resources:
     Properties:
       AssociatePublicIpAddress: true
       PlacementTenancy: !Ref BastionTenancy
-      KeyName: !Ref KeyPairName
       IamInstanceProfile: !Ref BastionHostProfile
       ImageId: !If
         - UseOSImageOverride
