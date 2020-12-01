@@ -12,10 +12,10 @@ if __name__ == "__main__":
         i for i in res["DeliveryStreamNames"] if i.startswith("streaming_submissions-")
     ]
     batch = []
-    for filename in glob.glob(sys.argv[1]):
+    for num, filename in zip(["1", "2", "3", "4"], glob.glob(sys.argv[1])):
         with open(filename) as csvf:
             for i, row in enumerate(csvf.readlines()):
-                batch.append({"Data": row})
+                batch.append({"Data": num + row})
                 if len(batch) >= batchsize:
                     client.put_record_batch(
                         DeliveryStreamName=streamname, Records=batch
