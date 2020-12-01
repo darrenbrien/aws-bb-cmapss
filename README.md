@@ -11,9 +11,9 @@ A lab to demo AWS data and machine learning services
 
 ## Getting started
 
-* Deploy the CloudFormation stack in the templates folder
-  * This deployment will incur some modest charges while deployed
-  * It'll be easy to delete all the services as the end
+* ~Deploy the CloudFormation stack in the templates folder~
+  * ~This deployment will incur some modest charges while deployed~
+  * ~It'll be easy to delete all the services as the end~
 
 1. Create an s3 bucket we can use for our deployment in the us-east-1 region
 use the console or from the CLI
@@ -35,7 +35,17 @@ be sure to change the bucket to the bucket you created during 1.
 * Created a SageMaker notebook to do some data analysis and submit SageMaker training jobs from
 * Created a Cloud9 deployment we can use as a terminal environment.
 
+## Lets publish some data onto our delivery stream
+* This will just be a simple python script, but imagine we're collecting this data in realtime over IOT core, publishing the data onto kinesis stream and using firehose to buffer the data onto S3 for us!
+* Go to "Cloud9" in the AWS console page
+* Open the stack Cloud9 stack (a micro EC2 instance)
+* We need to install the python boto3 package
 
+`sudo pip install boto3`
+
+* Next we need to sync this very gitrepo so we can use the scripts
+
+`git clone 
 
 `cd SageMaker`
 
