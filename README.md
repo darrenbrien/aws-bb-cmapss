@@ -29,7 +29,7 @@ This lab has been deployed to the `us-east-1` region (North Virginia), make sure
 
 ## Lab Exercise 
 
-### Publish data onto our delivery stream
+## Part 1 - Publish data onto our delivery stream
 
 * This will just be a simple python script, but imagine we're collecting this data in realtime over IOT core, publishing the data onto kinesis stream and using firehose to buffer the data onto S3 for us!
 * Go to "Cloud9" in the AWS console page
@@ -48,9 +48,9 @@ This lab has been deployed to the `us-east-1` region (North Virginia), make sure
 
 `python src/publisher.py 'data/train_*'  <- quotes matter or you'll just publish a single file :( 
 
-### Navigate into the S3 area of the console
+## Part 2 - Run the glue crawler and perform some ETL 
 
-1. Review the contents and structure of the submissions bucket
+1. Navigate into the S3 area of the console review the contents and structure of the submissions bucket
 
 2. We can see our data has arrived, we haven't really done much with it yet, just simulate a realtime (ish) data arrival 
 
@@ -69,7 +69,7 @@ Tick the crawler and select run, this should take ~1 minute.
 
 5. Now we know a little about the submissions data, we can perform some ETL to make it usable
 
-### Our Challenge
+#### A little about the dataset
 
 * We're collecting data in realtime about some engine tests that are going on
 * We collect data until the engine "fails" and requires maintenance
@@ -91,7 +91,9 @@ You should have a bucket with curated in the name `datalake-curated-dataset-1234
 
 `aws s3 mb s3://aws-glue-$(openssl rand -hex 5)`
 
-### Important your bucket must start with the aws-glue prefix or bad things will happen
+### Important
+
+Your bucket must start with the aws-glue prefix or bad things will happen
 
 7. Back in the glue console click Action => Save As
 
@@ -99,13 +101,41 @@ Enter the `s3://<the-bucket-you-just-created`
 
 Click save
 
-8. Finally Selection run-job
+8. select run-job, the job should take about 4-5 minutes to complete, including start up time
 
-3. Hit the Edit Script button
-Run the 
+9. Now lets run our second glue crawler to so we can query this data in athena
+
+## Part 3 - Use AWS Athena to create a train / validation data
+
+* Machine learning models working well when they generalize to "unseen" data
+* When a model fits training data with 99% accuracy and unseen evaluation data with 10% accuracy are said to be "overfitted" to the training data. 
+* We want to create a training and evaluation set which helps our model not to overfit.
+
+1. In Cloud9 open the ctas_training_evaluation_file.sql, we'll need to replace the s3 paths in this query to reflect your data. Leave everything else the same.
+2. Open the athena console and paste in the query, be careful to avoid typos
+  * otherwise you may have to delete some s3 objects which may be created incorrectly 
+  * this "create table as command" is not idempotent
+3. This query splits our data into 3 and will use two thirds for training and one third for evaluation. Ideally we'd get a similiar level of performance on both datasets.
+
+
+## Part 4 - SageMaker Notebook, Training Jobs and inference end points
+
+80% of Machine Learning is working with data, thats why most of this lab is using data tools.
+
+1. Open up SageMaker from the console and navigate the SageMakerNotebooks.
+2. Click the jupyterlab link, this is a jupyternotebook.
+3. We need to pull our git repo here (again)
+
+Click terminal
+
+`cd SageMaker`
+
+run
+
 `git clone https://github.com/darrenbrien/aws-bb-cmapss.git`
 
-`python 'src/publisher.py data/train_*'
-
-
-
+4. In the left hand panel you should now seethe aws-bb-cmapss folder, click through into src
+5. Open both ipynb file eda and model
+6. eda.ipynb is a little buggy, usually when building a model from scratch data scientists perform and Exploritary Data Analysis to try to help understand the data better. You can see how the jupyter environment can be useful to interate quickly and understand you data with tables and charts in a REPL environment.
+7. Now lets train a SageMaker Model open model.ipynb
+8. We'll work through this notebook together and finish up the lab with a model inference end point we can send new data to!
