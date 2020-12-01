@@ -25,7 +25,7 @@ A lab to demo AWS data and machine learning services
 This lab has been deployed to the `us-east-1` region (North Virginia), make sure you're access resources from this region!
 
 ## Architecture
-![alt text](https://github.com/darrenbrien/aws-bb-cmapss/src/aws_ml_lab.png "Logo Title Text 1")
+![alt text](https://github.com/darrenbrien/aws-bb-cmapss/blob/master/src/aws_ml_lab.png "Logo Title Text 1")
 
 ## Lab Exercise 
 
