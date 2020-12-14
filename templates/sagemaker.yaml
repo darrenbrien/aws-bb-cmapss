@@ -16,9 +16,10 @@ Parameters:
     Type: String
     AllowedValues:
       - ml.t2.medium
+      - ml.t3.medium
       - ml.t2.large
       - ml.t2.xlarge
-    Default: ml.t2.medium
+    Default: ml.t3.medium
   # SubnetId:
   #   Description: Subnet sagemaker should use
   #   Type: String
