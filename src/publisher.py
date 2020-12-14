@@ -3,6 +3,15 @@ from os.path import basename
 import glob
 import boto3
 
+
+def publish_batch(client, streamname, batch):
+    response = client.put_record_batch(DeliveryStreamName=streamname, Records=batch)
+    if response["FailedPutCount"] > 0:
+        print(f"{response['FailedPutCount']} failed")
+        print(response)
+    batch.clear()
+
+
 if __name__ == "__main__":
     sess = boto3.Session(region_name="us-east-1",)
     client = sess.client("firehose")
@@ -18,12 +27,9 @@ if __name__ == "__main__":
             for i, row in enumerate(csvf.readlines()):
                 batch.append({"Data": basename(filename) + " " + row})
                 if len(batch) >= batchsize:
-                    client.put_record_batch(
-                        DeliveryStreamName=streamname, Records=batch
-                    )
-                    batch.clear()
+                    publish_batch(client, streamname, batch)
             else:
-                client.put_record_batch(DeliveryStreamName=streamname, Records=batch)
+                publish_batch(client, streamname, batch)
                 print(
-                    f"Published {i} records to {streamname} from {filename} in batches of {batchsize}"
+                    f"Published {i + 1} records to {streamname} from {filename} in batches of {batchsize}"
                 )

@@ -1,10 +1,4 @@
-CREATE TABLE "datalake_curated_datasets"."cmaps_rul_train_validation"
-WITH ( 
-  format = 'TEXTFILE', 
-  field_delimiter = ',', 
-  external_location = 's3://datalake-published-data-907317471167-us-east-1-gismq40/cmaps-ml2', 
-  partitioned_by = ARRAY['split', 'year', 'month', 'day', 'hour']
-  ) AS
+INSERT INTO "datalake_curated_datasets"."cmaps_rul_train_validation"
 SELECT failure_cycle,
          cycle,
          op_1,
@@ -37,4 +31,4 @@ SELECT failure_cycle,
     ELSE 'train'
     END AS split, year, month, day, hour
 FROM "datalake_curated_datasets"."datalake_curated_datasets_907317471167_us_east_1_gismq40"
-WHERE hour = '08'
+WHERE hour = '19'
