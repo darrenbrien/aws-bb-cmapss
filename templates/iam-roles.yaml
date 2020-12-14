@@ -23,7 +23,7 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - 'arn:aws:s3:::aws-bb-darren-predictive-maintenance-capstone/*'
+                  - 'arn:aws:s3:::aws-bb-darren*/*'
               - Effect: Allow
                 Action:
                   - s3:GetObject
