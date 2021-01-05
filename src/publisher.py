@@ -8,8 +8,11 @@ def publish_batch(client, streamname, batch):
     response = client.put_record_batch(DeliveryStreamName=streamname, Records=batch)
     if response["FailedPutCount"] > 0:
         print(f"{response['FailedPutCount']} failed")
-        print(response)
-    batch.clear()
+        for i, obj in response["RequestResponses"]:
+            if "RecordId" in obj:
+                del batch[i]
+    else:
+        batch.clear()
 
 
 if __name__ == "__main__":

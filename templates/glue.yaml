@@ -28,91 +28,6 @@ Resources:
       DatabaseInput:
         Name: datalake_curated_datasets
         Description: Data Lake Quick Start Curated Datasets
-  # CuratedDatasetsTable:
-  #   DependsOn: CuratedDatasetsDatabase
-  #   Type: AWS::Glue::Table
-  #   Properties:
-  #     CatalogId: !Ref AWS::AccountId
-  #     DatabaseName: datalake_curated_datasets
-  #     TableInput:
-  #       Name: cmapss_rul
-  #       TableType: EXTERNAL_TABLE
-  #       Parameters: {"classification": parquet}
-  #       PartitionKeys:
-  #         - Name: year
-  #           Type: string
-  #         - Name: month
-  #           Type: string
-  #         - Name: day
-  #           Type: string
-  #         - Name: hour
-  #           Type: string
-  #       StorageDescriptor:
-  #         Columns:
-  #           - Name: unit_number
-  #             Type: bigint
-  #           - Name: failure_cycle
-  #             Type: bigint
-  #           - Name: cycle
-  #             Type: bigint
-  #           - Name: op_1
-  #             Type: double
-  #           - Name: op_2
-  #             Type: double
-  #           - Name: op_3
-  #             Type: double
-  #           - Name: sensor_measurement_1
-  #             Type: double
-  #           - Name: sensor_measurement_2
-  #             Type: double
-  #           - Name: sensor_measurement_3
-  #             Type: double
-  #           - Name: sensor_measurement_4
-  #             Type: double
-  #           - Name: sensor_measurement_5
-  #             Type: double
-  #           - Name: sensor_measurement_6
-  #             Type: double
-  #           - Name: sensor_measurement_7
-  #             Type: double
-  #           - Name: sensor_measurement_8
-  #             Type: double
-  #           - Name: sensor_measurement_9
-  #             Type: double
-  #           - Name: sensor_measurement_10
-  #             Type: double
-  #           - Name: sensor_measurement_11
-  #             Type: double
-  #           - Name: sensor_measurement_12
-  #             Type: double
-  #           - Name: sensor_measurement_13
-  #             Type: double
-  #           - Name: sensor_measurement_14
-  #             Type: double
-  #           - Name: sensor_measurement_15
-  #             Type: double
-  #           - Name: sensor_measurement_16
-  #             Type: double
-  #           - Name: sensor_measurement_17
-  #             Type: bigint
-  #           - Name: sensor_measurement_18
-  #             Type: bigint
-  #           - Name: sensor_measurement_19
-  #             Type: double
-  #           - Name: sensor_measurement_20
-  #             Type: double
-  #           - Name: sensor_measurement_21
-  #             Type: double
-  #         InputFormat: "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
-  #         OutputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-  #         SerdeInfo: 
-  #           SerializationLibrary: "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
-  #         Location: !Join
-  #           - ""
-  #           - - "s3://"
-  #             - !Ref "CuratedBucketName"
-  #             - /
-  #             - cmapss-rul
   CMAPSSClassifier:
     Type: AWS::Glue::Classifier
     Properties:
@@ -151,7 +66,6 @@ Resources:
       SchemaChangePolicy:
         UpdateBehavior: "UPDATE_IN_DATABASE"
         DeleteBehavior: "LOG"
-
   CMAPSSJob:
     Type: AWS::Glue::Job
     Properties:
@@ -166,6 +80,50 @@ Resources:
       MaxRetries: 0
       Name: calc_rul
       Role: !Ref GlueJobRole
+  Workflow:
+    Type: AWS::Glue::Workflow
+    Properties: 
+      Description: Workflow for orchestrating jobs
+      Name: CMapssWorkflow
+  WorkflowStartTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Name: StartTrigger
+      Type: ON_DEMAND
+      Description: Trigger for starting the workflow
+      Actions:
+        - CrawlerName: !Ref CMAPSSSubmissions 
+      WorkflowName: !Ref Workflow
+  WorkflowJobTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Name: CrawlerSuccessfulTrigger
+      Type: CONDITIONAL
+      StartOnCreation: True
+      Description: Trigger to start the glue job
+      Actions:
+        - JobName: !Ref CMAPSSJob
+      Predicate:
+        Conditions:
+          - LogicalOperator: EQUALS
+            CrawlerName: !Ref CMAPSSSubmissions
+            CrawlState: SUCCEEDED
+      WorkflowName: !Ref Workflow
+  WorkflowCrawlerTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Name: JobSuccessfulTrigger
+      Type: CONDITIONAL
+      StartOnCreation: True
+      Description: Trigger to start the glue job
+      Actions:
+        - CrawlerName: !Ref CMAPSSCuratedRUL
+      Predicate:
+        Conditions:
+          - LogicalOperator: EQUALS
+            JobName: !Ref CMAPSSJob
+            State: SUCCEEDED
+      WorkflowName: !Ref Workflow
 Outputs:
   CuratedDatasetsDatabaseName:
     Value: !Ref 'CuratedDatasetsDatabase'
