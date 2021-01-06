@@ -2,6 +2,8 @@
 # AWS Blackbelt Capstone Predictive maintenance project writeup 
 
 ## Intro
+<details>
+    <Summary>Click to expand</summary>
 
 The Nasa Turbofan dataset is interesting to use for a machine learning project for a couple of reasons.
 * Predictive maintenance has traditionally leveraged classical statistics to provide insights. Survival Analysis would be a common approach, however the many observations and exogenous variables in this dataset provide an opportunity to apply machine learning to discover more subtle patterns in the data.
@@ -17,8 +19,11 @@ With the above in mind our data pipeline will need to calculate a remaining usef
 </p>
 
 The remaining useful life for unit number (u) on cycle (i) is the maximum cycle observed in the dataset for that unique unit number minus the current cycle number, i.
+</details>
 
 ## Data Ingestion and Transformation
+<details>
+    <Summary>Click to expand</summary>
 
 Given the multiple engines contained in the dataset one could envisage a scenario where device data arrived in real-time as cycles were completed. For this reason I decided to encorporate a setup using kinesis firehose to buffer data as it arrive and to write the data out to S3 in batches. In a production solution a customer could leverage AWS IOT Core to publish data from devices in the cloud and use an IOT Rule to forward data onto a kinesis data stream. Our firehose solution could easily consume from this stream, in the interests of expediency this project simulates the above using a simple python script running on a Cloud9 instance to publish the data.
 
@@ -27,14 +32,20 @@ Once data arrives in S3 a glue crawler is configured to discover metadata and ad
 A constraint of the dataset is that until the final (failure) observation per unit number (engine) the RUL value cannot be calculated, we can't know how long an engine will last on cycle 1 until it subsequently fails. As such the notion of engine failure is implict to the way the data is structured, so for the purposes of this project data arrives in complete batches from the files provided.  
 
 ### Todo add architecture diagram
+</details>
 
 ## Data Preparation
+<details>
+    <Summary>Click to expand</summary>
 
 As discussed in [intro](#Intro) the dataset requires us to calculate RUL for each observation, a Spark glue job is a scalable way to enable this as our data is tabular we can leverage the dataframe abstraction Spark provides. Leveraging a Glue Workflow enables us to chain our glue crawlers and jobs into a DAG which make the pipeline easier to manage and ensures we minimize the time between new data arriving and insight being available to our users.
 
 ### ToDo insert workflow screen
+</details>
 
 ## Data Visualisation
+<details>
+    <Summary>Click to expand</summary>
 
 An initial EDA was performed on the data to understand the dataset and relationships between the exogenous and endogenous (RUL) variables, this informed the approach described so far and worked with the entire (small ~30Mb) dataset. In a production scenario the dataset could be representatively sampled to achieve a similar insights to be achieved.
 
@@ -49,19 +60,6 @@ df.head()
 ```
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -222,19 +220,6 @@ df.describe().T
 ```
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -626,7 +611,7 @@ for i, a in zip(range(1, 22), axes):
 The training data for 2 and 4 have 6 different operational settings and we can see how this effects the measurements, as files 2 and 4 have several operational settings where as files 1 and 3 have individual settings we can see that operational setting and some of the sensor measurements interact, resulting in the difference between the plots (clear non linear trends vs noisy plots).
 ![png](images/eda_18_0.png)
 
-Given the above an ensemble model may be an appropriate approach as the data exhibits no linear effects and has clear interactions between the exogenous variables which a tree based method can discover. 
+Given the above an ensemble model may be an appropriate approach as the data exhibits non linear effects and has clear interactions between the exogenous variables which a tree based method can discover. 
 
 ```python
 from sklearn.ensemble import RandomForestRegressor
@@ -700,7 +685,11 @@ An ensemble based method outperforms a niave mean prediction by ~50%
 
 ### ToDo insert quick sight screens
 
+</details>
+
 ## Training Models
+<details>
+    <Summary>Click to expand</summary>
 
 
 ```python
@@ -1374,10 +1363,23 @@ while status != "Completed" and status != "Failed":
     CPU times: user 1.21 s, sys: 60.4 ms, total: 1.27 s
     Wall time: 1h 9min 11s
 
+</details>
 
 ## Evaluate ML Models
+<details>
+    <Summary>Click to expand</summary>
+
+</details>
 
 ## Improving ML models accuracy
+<details>
+    <Summary>Click to expand</summary>
+
+</details>
 
 ## Machine Learning Implementation / Operations & Well-Architected
+<details>
+    <Summary>Click to expand</summary>
+
+</details>
 
