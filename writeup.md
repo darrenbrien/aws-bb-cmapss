@@ -1,22 +1,30 @@
 
-# AWS Blackbelt Capstone Predictive Maintainance project writeup 
+# AWS Blackbelt Capstone Predictive maintenance project writeup 
 
 ## Intro
 
 The Nasa Turbofan dataset is interesting to use for a machine learning project for a couple of reasons.
-* Predictive maintainance has traditionally leveraged classical statistics to provide insights. Survival Analysis would be a common approach, however the many observations and exogenous variables in this dataset provide an opportunity to apply machine learning to discover more subtle patterns in the data.
-* This data isn't provided with a clear set of labels to train a model, it potentially lends itself to either regression or classification. Given the number of observations, framing this as a regression problem makes sense as we are able to incorporate more information into our loss function as a result of the continuous (discrete) remaining useful life versus a binary observation. A classification model would additionally have severe imbalance.
+* Predictive maintenance has traditionally leveraged classical statistics to provide insights. Survival Analysis would be a common approach, however the many observations and exogenous variables in this dataset provide an opportunity to apply machine learning to discover more subtle patterns in the data.
+* This data isn't provided with a clear set of labels to train a model, it potentially lends itself to either regression or classification. 
+  * Given the number of observations, framing this as a regression problem makes sense as we are able to incorporate more information into our loss function as a result of the continuous (discrete) remaining useful life versus a binary observation. 
+  * A classification model would have severe class imbalance as few observation result in engine failure. 
+  * Furthermore framing the problem in this way enables the consumer of the predictions to instigate a "no suprises" policy where maintenance is actively performed on engines likely to have a fault in the near future e.g. all engines with less than 50 RUL will have maintenance performed. Assuming planned maintenance is cheaper to operate than reactive maintenance, *"a stitch in time saves 9"*. 
 
 With the above in mind our data pipeline will need to calculate a remaining useful life (RUL) for each observation.
 
-$$RUL_{u, i}=\max_{j=0}^n cycle_{u,j} - cycle_{u,i}$$
+<p align="center">
+<img src="https://render.githubusercontent.com/render/math?math=RUL_{u, i}=\max_{j=0}^n cycle_{u,j} - cycle_{u,i}">
+</p>
+
 The remaining useful life for unit number (u) on cycle (i) is the maximum cycle observed in the dataset for that unique unit number minus the current cycle number, i.
 
 ## Data Ingestion and Transformation
 
 Given the multiple engines contained in the dataset one could envisage a scenario where device data arrived in real-time as cycles were completed. For this reason I decided to encorporate a setup using kinesis firehose to buffer data as it arrive and to write the data out to S3 in batches. In a production solution a customer could leverage AWS IOT Core to publish data from devices in the cloud and use an IOT Rule to forward data onto a kinesis data stream. Our firehose solution could easily consume from this stream, in the interests of expediency this project simulates the above using a simple python script running on a Cloud9 instance to publish the data.
 
-Once data arrives in S3 a glue crawler is configured to discover this data and add it to the data catalog, this enables data preparation jobs to run against the discovered schema. The crawler could at a frequency as low as 5 minutes, enabling our system to provide soft real-time experience for users of the system.
+Once data arrives in S3 a glue crawler is configured to discover metadata and add it to the dataset to the glue data catalog, this enables data preparation jobs to run against the discovered schema. The crawler could at a frequency as low as 5 minutes, enabling our system to provide soft real-time experience for users of the system. Our glue jobs take the raw csv data and calculate the RUL value per observation.
+
+A constraint of the dataset is that until the final (failure) observation per unit number (engine) the RUL value cannot be calculated, we can't know how long an engine will last on cycle 1 until it subsequently fails. As such the notion of engine failure is implict to the way the data is structured, so for the purposes of this project data arrives in complete batches from the files provided.  
 
 ### Todo add architecture diagram
 
@@ -647,8 +655,12 @@ cls = RandomForestRegressor(n_jobs=-1, n_estimators=40, )
 cls = cls.fit(x_train, y_train)
 cls.score(x_test, y_test)
 ```
-What is the explained variance in the dataset
-$$R^2$$
+What percentage of the variance in the dataset does this model explain?
+
+<p align="center">
+<img src="https://render.githubusercontent.com/render/math?math=R^2">
+</p>
+
     0.6777656054746929
 
 ```python
@@ -684,22 +696,11 @@ RMSE
 
 An ensemble based method outperforms a niave mean prediction by ~50% 
 * Next steps apply Xgboost, gradient boosting generally outperforms random forest when tuned appropriately
-* this approach above validates the potential value before we commit to building a sagemaker model, ie if there wasn't a margin over out "dummy" model then building a sagemaker model wouldn't probably be fruitful. 
-
-
+* This approach validates the potential value before we commit to building a sagemaker model, ie if there wasn't a margin over out "dummy" model then building a sagemaker model wouldn't probably be fruitful. 
 
 ### ToDo insert quick sight screens
 
 ## Training Models
-
-## Evaluate ML Models
-
-## Improving ML models accuracy
-
-## Machine Learning Implementation / Operations & Well-Architected
-
-
-
 
 
 ```python
@@ -937,7 +938,7 @@ Finally, the customer can now validate the model for use. They can obtain the en
 
 
 ```python
-runtime_client = boto3.client("runtime.sagemaker", region_name=rZZZegion)
+runtime_client = boto3.client("runtime.sagemaker", region_name=region)
 ```
 
 Start with a single prediction.
@@ -1276,7 +1277,6 @@ create_training_params = {
 }
 ```
 
-
 ```python
 %%time
 import boto3
@@ -1375,325 +1375,9 @@ while status != "Completed" and status != "Failed":
     Wall time: 1h 9min 11s
 
 
-Note that the "validation" channel has been initialized too. The SageMaker XGBoost algorithm actually calculates RMSE and writes it to the CloudWatch logs on the data passed to the "validation" channel.
+## Evaluate ML Models
 
-## Set up hosting for the model
-In order to set up hosting, we have to import the model from training to hosting. 
+## Improving ML models accuracy
 
-### Import model into hosting
+## Machine Learning Implementation / Operations & Well-Architected
 
-Register the model with hosting. This allows the flexibility of importing models trained elsewhere.
-
-
-```python
-%%time
-import boto3
-from time import gmtime, strftime
-
-model_name = f"{job_name}-model"
-print(model_name)
-
-info = client.describe_training_job(TrainingJobName=job_name)
-model_data = info["ModelArtifacts"]["S3ModelArtifacts"]
-print(model_data)
-
-primary_container = {"Image": container, "ModelDataUrl": model_data}
-
-create_model_response = client.create_model(
-    ModelName=model_name, ExecutionRoleArn=role, PrimaryContainer=primary_container
-)
-
-print(create_model_response["ModelArn"])
-```
-
-    cmapss-xgboost-regression-2020-12-14-14-39-48-model
-    s3://datalake-published-data-907317471167-us-east-1-gismq40/sagemaker/cmapss-xgboost/single-xgboost/cmapss-xgboost-regression-2020-12-14-14-39-48/output/model.tar.gz
-    arn:aws:sagemaker:us-east-1:907317471167:model/cmapss-xgboost-regression-2020-12-14-14-39-48-model
-    CPU times: user 25.3 ms, sys: 150 µs, total: 25.5 ms
-    Wall time: 1.59 s
-
-
-### Create endpoint configuration
-
-SageMaker supports configuring REST endpoints in hosting with multiple models, e.g. for A/B testing purposes. In order to support this, customers create an endpoint configuration, that describes the distribution of traffic across the models, whether split, shadowed, or sampled in some way. In addition, the endpoint configuration describes the instance type required for model deployment.
-
-
-```python
-from time import gmtime, strftime
-
-endpoint_config_name = f"cmapss-XGBoostEndpointConfig-{strftime('%Y-%m-%d-%H-%M-%S', gmtime())}"
-print(endpoint_config_name)
-create_endpoint_config_response = client.create_endpoint_config(
-    EndpointConfigName=endpoint_config_name,
-    ProductionVariants=[
-        {
-            "InstanceType": "ml.m5.xlarge",
-            "InitialVariantWeight": 1,
-            "InitialInstanceCount": 1,
-            "ModelName": model_name,
-            "VariantName": "AllTraffic",
-        }
-    ],
-)
-
-print(f"Endpoint Config Arn: {create_endpoint_config_response['EndpointConfigArn']}")
-```
-
-    cmapss-XGBoostEndpointConfig-2020-12-14-17-22-55
-    Endpoint Config Arn: arn:aws:sagemaker:us-east-1:907317471167:endpoint-config/cmapss-xgboostendpointconfig-2020-12-14-17-22-55
-
-
-### Create endpoint
-Lastly, the customer creates the endpoint that serves up the model, through specifying the name and configuration defined above. The end result is an endpoint that can be validated and incorporated into production applications. This takes 9-11 minutes to complete.
-
-
-```python
-%%time
-import time
-
-endpoint_name = f'cmapss-XGBoostEndpoint-{strftime("%Y-%m-%d-%H-%M-%S", gmtime())}'
-print(endpoint_name)
-create_endpoint_response = client.create_endpoint(
-    EndpointName=endpoint_name, EndpointConfigName=endpoint_config_name
-)
-print(create_endpoint_response["EndpointArn"])
-
-resp = client.describe_endpoint(EndpointName=endpoint_name)
-status = resp["EndpointStatus"]
-while status == "Creating":
-    print(f"Status: {status}")
-    time.sleep(60)
-    resp = client.describe_endpoint(EndpointName=endpoint_name)
-    status = resp["EndpointStatus"]
-
-print(f"Arn: {resp['EndpointArn']}")
-print(f"Status: {status}")
-```
-
-    cmapss-XGBoostEndpoint-2020-12-14-17-23-20
-    arn:aws:sagemaker:us-east-1:907317471167:endpoint/cmapss-xgboostendpoint-2020-12-14-17-23-20
-    Status: Creating
-    Status: Creating
-    Status: Creating
-    Status: Creating
-    Status: Creating
-    Status: Creating
-    Status: Creating
-    Status: Creating
-    Arn: arn:aws:sagemaker:us-east-1:907317471167:endpoint/cmapss-xgboostendpoint-2020-12-14-17-23-20
-    Status: InService
-    CPU times: user 142 ms, sys: 13.4 ms, total: 155 ms
-    Wall time: 8min 1s
-
-
-## Validate the model for use
-Finally, the customer can now validate the model for use. They can obtain the endpoint from the client library using the result from previous operations, and generate classifications from the trained model using that endpoint.
-
-
-
-```python
-runtime_client = boto3.client("runtime.sagemaker", region_name=rZZZegion)
-```
-
-Start with a single prediction.
-We didn't train with the engine number so drop this (first) field
-
-
-```python
-file = 4
-test_file_name = f'test_FD00{file}.txt'
-test_rul_name = f'RUL_FD00{file}.txt'
-filename = f"cmapss.test.{file}"
-single_filename = f"single.{filename}"
-test_file_name, test_rul_name
-```
-
-
-
-
-    ('test_FD004.txt', 'RUL_FD004.txt')
-
-
-
-
-```python
-! cat /home/ec2-user/SageMaker/aws-bb-cmapss/data/{test_file_name} | cut -d ' ' -f2- > {filename}
-```
-
-
-```python
-! head -1 {filename} > {single_filename}
-```
-
-
-```python
-!cat {single_filename}; wc -l {filename}
-```
-
-    1 20.0072 0.7000 100.0 491.19 606.67 1481.04 1227.81 9.35 13.60 332.52 2323.67 8704.98 1.07 43.83 313.03 2387.78 8048.98 9.2229 0.02 362 2324 100.00 24.31 14.7007  
-    41214 cmapss.test.4
-
-
-
-```python
-%%time
-import json
-from itertools import islice
-import math
-import struct
-
- # customize to your test file
-with open(single_file_name, "r") as f:
-    payload = f.read().strip()
-response = runtime_client.invoke_endpoint(
-    EndpointName=endpoint_name, ContentType="text/csv", Body=payload
-)
-result = response["Body"].read()
-result = result.decode("utf-8")
-result = result.split(",")
-result = [math.ceil(float(i)) for i in result]
-print(result)
-print(f"Label: {label}\nPrediction: {result[0]}")
-```
-
-    [194]
-    Label: 1
-    Prediction: 194
-    CPU times: user 6.17 ms, sys: 115 µs, total: 6.28 ms
-    Wall time: 11.7 ms
-
-
-OK, a single prediction works. Let's do a whole batch to see how good is the predictions accuracy.
-
-
-```python
-import sys
-import math
-
-
-def do_predict(data, endpoint_name, content_type):
-    payload = "\n".join(data)
-    response = runtime_client.invoke_endpoint(
-        EndpointName=endpoint_name, ContentType=content_type, Body=payload
-    )
-    result = response["Body"].read()
-    result = result.decode("utf-8")
-    result = result.split(",")
-    preds = [float((num)) for num in result]
-    preds = [math.ceil(num) for num in preds]
-    return preds
-
-
-def batch_predict(data, batch_size, endpoint_name, content_type):
-    items = len(data)
-    arrs = []
-
-    for offset in range(0, items, batch_size):
-        if offset + batch_size < items:
-            results = do_predict(data[offset : (offset + batch_size)], endpoint_name, content_type)
-            arrs.extend(results)
-        else:
-            arrs.extend(do_predict(data[offset:items], endpoint_name, content_type))
-        sys.stdout.write(".")
-    return arrs
-```
-
-The following helps us calculate the Median Absolute Percent Error (MdAPE) on the batch dataset. 
-
-
-```python
-import pandas as pd
-```
-
-
-```python
-test_data = pd.read_csv(f"/home/ec2-user/SageMaker/aws-bb-cmapss/data/{test_file_name}", header=None, delimiter=' ')
-```
-
-
-```python
-labels = pd.read_csv(f"/home/ec2-user/SageMaker/aws-bb-cmapss/data/{test_rul_name}", names=['remaining_cycles'])
-labels.index += 1
-labels = labels.reset_index()
-labels = labels.rename(columns={'index' : 0})
-labels = test_data.groupby(0)[1].max().reset_index().merge(labels, left_on=0, right_on=0)
-labels['max_cycles'] = labels[1] + labels['remaining_cycles']
-```
-
-
-```python
-test_data = test_data.merge(labels[[0, 'max_cycles']], left_on=0, right_on=0)
-```
-
-
-```python
-test_data['RUL'] = test_data['max_cycles'] - test_data[1]
-```
-
-
-```python
-len(inference_data), len(labels)
-```
-
-
-
-
-    (16596, 248)
-
-
-
-
-```python
-%%time
-import json
-import numpy as np
-
-with open(filename, "r") as f:
-    payload = f.read().strip()
-
-y_true = test_data['RUL'].to_list()
-inference_data = [line.strip() for line in payload.split("\n")]
-
-preds = batch_predict(inference_data, 100, endpoint_name, "text/csv")
-```
-
-    .............................................................................................................................................................................................................................................................................................................................................................................................................................CPU times: user 1.47 s, sys: 42.4 ms, total: 1.51 s
-    Wall time: 5.5 s
-
-
-
-```python
-from sklearn.metrics import mean_squared_error
-```
-
-
-```python
-len(y_true), len(preds)
-```
-
-
-
-
-    (41214, 41214)
-
-
-
-
-```python
-mean_squared_error(y_true, preds, squared=False)
-```
-
-
-
-
-    68.86138013002605
-
-
-
-### Delete Endpoint
-Once you are done using the endpoint, you can use the following to delete it. 
-
-
-```python
-client.delete_endpoint(EndpointName=endpoint_name)
-```
