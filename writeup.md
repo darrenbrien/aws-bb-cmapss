@@ -31,7 +31,10 @@ Once data arrives in S3 a glue crawler is configured to discover metadata and ad
 
 A constraint of the dataset is that until the final (failure) observation per unit number (engine) the RUL value cannot be calculated, we can't know how long an engine will last on cycle 1 until it subsequently fails. As such the notion of engine failure is implict to the way the data is structured, so for the purposes of this project data arrives in complete batches from the files provided.  
 
-### Todo add architecture diagram
+### Project architecture diagram
+
+![png](src/aws_ml_lab.png)
+
 </details>
 
 ## Data Preparation
@@ -40,7 +43,9 @@ A constraint of the dataset is that until the final (failure) observation per un
 
 As discussed in [intro](#Intro) the dataset requires us to calculate RUL for each observation, a Spark glue job is a scalable way to enable this as our data is tabular we can leverage the dataframe abstraction Spark provides. Leveraging a Glue Workflow enables us to chain our glue crawlers and jobs into a DAG which make the pipeline easier to manage and ensures we minimize the time between new data arriving and insight being available to our users.
 
-### ToDo insert workflow screen
+### Workflow diagram
+![](images/workflow.png)
+
 </details>
 
 ## Data Visualisation
@@ -683,7 +688,16 @@ An ensemble based method outperforms a niave mean prediction by ~50%
 * Next steps apply Xgboost, gradient boosting generally outperforms random forest when tuned appropriately
 * This approach validates the potential value before we commit to building a sagemaker model, ie if there wasn't a margin over out "dummy" model then building a sagemaker model wouldn't probably be fruitful. 
 
-### ToDo insert quick sight screens
+### Quicksight dashboard
+
+A quicksight dashboard to enable insight into the distribution of features in the dataset to aid debugging the model as new data arrives
+
+![png](images/qs_1.png)
+<br/>*Dashboard after first training data file has been published.*
+![png](images/qs_2.png)
+<br/>*Dashboard after first and second training data files have been published, note the change in the distribution of some features and operational settings.*
+![png](images/qs_3.png)
+<br/>*Dashboard after all training data files have been published.*
 
 </details>
 
@@ -691,6 +705,62 @@ An ensemble based method outperforms a niave mean prediction by ~50%
 <details>
     <Summary>Click to expand</summary>
 
+### Preparing the training data
+
+* Our glue job have produced a dataset with the required labels in parquet format on S3.
+* We can now leverage athena to create training/eval data, we could have used glue for this also.
+    * We use a CTAS query to create a new training dataset to be used by SageMaker
+* An important consideration for this dataset is how we split data between train and evaluation.
+    * As our data has significant serial correlation, for a unique engine late cycles depend on earlier cycles, specifically the RUL for a given observation is linearly related to the RUL for all other cycles based on the difference between their cycle number.
+    * For this reason its important to ensure our training data doesn't pollute the evaluation data, a few strategies are available.
+        1. Ensure no training data for a given engine has a cycle number _higher_ than that in the evaulation set and no evaluation data for a given engine has a cycle number _lower_
+than any cycle in the training set.
+        2. Partition training and evaluation data so no single engine appears in either dataset. (This was the strategy we went for)
+
+```
+CREATE TABLE "datalake_curated_datasets"."cmaps_rul_train_validation"
+WITH ( 
+  format = 'TEXTFILE', 
+  field_delimiter = ',', 
+  external_location = 's3://datalake-published-data-907317471167-us-east-1-gismq40/cmaps-ml2', 
+  partitioned_by = ARRAY['split', 'year', 'month', 'day', 'hour']
+  ) AS
+SELECT failure_cycle,
+         cycle,
+         op_1,
+         op_2,
+         op_3,
+         sensor_measurement_1 ,
+         sensor_measurement_2 ,
+         sensor_measurement_3 ,
+         sensor_measurement_4 ,
+         sensor_measurement_5 ,
+         sensor_measurement_6 ,
+         sensor_measurement_7 ,
+         sensor_measurement_8 ,
+         sensor_measurement_9 ,
+         sensor_measurement_10 ,
+         sensor_measurement_11 ,
+         sensor_measurement_12 ,
+         sensor_measurement_13 ,
+         sensor_measurement_14 ,
+         sensor_measurement_15 ,
+         sensor_measurement_16 ,
+         sensor_measurement_17 ,
+         sensor_measurement_18 ,
+         sensor_measurement_19 ,
+         sensor_measurement_20,
+         sensor_measurement_21,        
+    CASE unit_number % 3
+    WHEN 0 THEN
+    'validation'
+    ELSE 'train'
+    END AS split, year, month, day, hour
+FROM "datalake_curated_datasets"."datalake_curated_datasets_907317471167_us_east_1_gismq40"
+WHERE hour = '08'
+```
+
+### A single Sagemaker training job
 
 ```python
 %%time
@@ -732,6 +802,8 @@ container = retrieve(framework="xgboost", region=region, version="1.2-1")
 ```
 
 
+Create a simple XGboost with fixed hyper parameters
+
 ```python
 %%time
 import boto3
@@ -739,8 +811,6 @@ from time import gmtime, strftime
 
 job_name = f"cmapss-xgboost-regression-{strftime('%Y-%m-%d-%H-%M-%S', gmtime())}"
 print("Training job", job_name)
-
-# Ensure that the training and validation data folders generated above are reflected in the "InputDataConfig" parameter below.
 
 create_training_params = {
     "AlgorithmSpecification": {"TrainingImage": container, "TrainingInputMode": "Pipe"},
@@ -809,8 +879,10 @@ while status != "Completed" and status != "Failed":
     CPU times: user 90.6 ms, sys: 5.66 ms, total: 96.2 ms
     Wall time: 4min
 
+Achieved RMSE is slightly better than our EDA random forest model with RMSE of 45.95 if we were to select the best iteration and use early stopping. I note the training performance diverges from the eval performance around iteration 60.
 
-Note that the "validation" channel has been initialized too. The SageMaker XGBoost algorithm actually calculates RMSE and writes it to the CloudWatch logs on the data passed to the "validation" channel.
+![](images/training.png)
+
 
 ## Set up hosting for the model
 In order to set up hosting, we have to import the model from training to hosting. 
@@ -922,8 +994,7 @@ print(f"Status: {status}")
 
 
 ## Validate the model for use
-Finally, the customer can now validate the model for use. They can obtain the endpoint from the client library using the result from previous operations, and generate classifications from the trained model using that endpoint.
-
+Now to we can validate our model and simulate a production scenario using the test data set.
 
 
 ```python
@@ -940,16 +1011,9 @@ test_file_name = f'test_FD00{file}.txt'
 test_rul_name = f'RUL_FD00{file}.txt'
 filename = f"cmapss.test.{file}"
 single_filename = f"single.{filename}"
-test_file_name, test_rul_name
 ```
 
-
-
-
-    ('test_FD004.txt', 'RUL_FD004.txt')
-
-
-
+Transform the test data, drop unit_number column. 
 
 ```python
 ! cat /home/ec2-user/SageMaker/aws-bb-cmapss/data/{test_file_name} | cut -d ' ' -f2- > {filename}
@@ -959,15 +1023,6 @@ test_file_name, test_rul_name
 ```python
 ! head -1 {filename} > {single_filename}
 ```
-
-
-```python
-!cat {single_filename}; wc -l {filename}
-```
-
-    1 20.0072 0.7000 100.0 491.19 606.67 1481.04 1227.81 9.35 13.60 332.52 2323.67 8704.98 1.07 43.83 313.03 2387.78 8048.98 9.2229 0.02 362 2324 100.00 24.31 14.7007  
-    41214 cmapss.test.4
-
 
 
 ```python
@@ -1033,18 +1088,12 @@ def batch_predict(data, batch_size, endpoint_name, content_type):
     return arrs
 ```
 
-The following helps us calculate the Median Absolute Percent Error (MdAPE) on the batch dataset. 
-
-
 ```python
 import pandas as pd
-```
-
-
-```python
 test_data = pd.read_csv(f"/home/ec2-user/SageMaker/aws-bb-cmapss/data/{test_file_name}", header=None, delimiter=' ')
 ```
 
+Calculate the inference data RUL values
 
 ```python
 labels = pd.read_csv(f"/home/ec2-user/SageMaker/aws-bb-cmapss/data/{test_rul_name}", names=['remaining_cycles'])
@@ -1053,30 +1102,9 @@ labels = labels.reset_index()
 labels = labels.rename(columns={'index' : 0})
 labels = test_data.groupby(0)[1].max().reset_index().merge(labels, left_on=0, right_on=0)
 labels['max_cycles'] = labels[1] + labels['remaining_cycles']
-```
-
-
-```python
 test_data = test_data.merge(labels[[0, 'max_cycles']], left_on=0, right_on=0)
-```
-
-
-```python
 test_data['RUL'] = test_data['max_cycles'] - test_data[1]
 ```
-
-
-```python
-len(inference_data), len(labels)
-```
-
-
-
-
-    (16596, 248)
-
-
-
 
 ```python
 %%time
@@ -1096,25 +1124,10 @@ preds = batch_predict(inference_data, 100, endpoint_name, "text/csv")
     Wall time: 5.5 s
 
 
+For the test file 4 we see a performance quite a lot worse than our eval performance, this requires some investigation and may indicate we need to do some feature engineering to enable the model to differentiate between the different operational settings "regimes" we've seen in the [Data Visualisation](#Data-Visualisation) section. We'll investigate this subsequently and move on to hyperparameter optimization.
 
 ```python
 from sklearn.metrics import mean_squared_error
-```
-
-
-```python
-len(y_true), len(preds)
-```
-
-
-
-
-    (41214, 41214)
-
-
-
-
-```python
 mean_squared_error(y_true, preds, squared=False)
 ```
 
@@ -1132,6 +1145,9 @@ Once you are done using the endpoint, you can use the following to delete it.
 ```python
 client.delete_endpoint(EndpointName=endpoint_name)
 ```
+
+### Hyper parameter training job
+
 ```python
 %%time
 
@@ -1291,77 +1307,24 @@ while status != "Completed" and status != "Failed":
 
     Training job hyper-cmapss-2020-12-14-21-06-58
     InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
-    InProgress
+    ...
     InProgress
     Completed
     CPU times: user 1.21 s, sys: 60.4 ms, total: 1.27 s
     Wall time: 1h 9min 11s
+
+### Sagemaker Console hyper param jobs screens
+
+![](images/hyper_param_jobs.png)
+
+![](images/hyper_training_loss.png)
+<br/>*We see an improved performance on our evaluation data and also note the training could have run for more rounds (it doesn't appear to have fully converged).*
+
+### TODO Deploy best model endpoint (how does it perform)
+
+### TODO Auto Scaling endpoints
+
+### TODO Spot Training
 
 </details>
 

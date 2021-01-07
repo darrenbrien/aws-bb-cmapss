@@ -141,13 +141,23 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
       Path: /service-role/
       Policies:
-        - PolicyName: CuratedBucketS3BucketAccess
+        - PolicyName: PublishedBucketS3BucketAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - s3:*
+                Resource:
+                  - !Sub '${PublishedDataARN}*'
+        - PolicyName: CuratedBucketS3BucketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket 
+                  - s3:GetObject
                 Resource:
                   - !Sub '${CuratedDatasetsARN}*'
         - PolicyName: SageMakerS3Access
