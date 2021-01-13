@@ -185,6 +185,8 @@ Achieved RMSE is slightly better than our EDA random forest model with RMSE of 4
 
 ### Hyper parameter training job
 
+Now we've managed to reproduce the performance of the MVM model in our EDA we can search hyperparameter space for a set of parameters which achieve the best out of sample performance. We use bayesian search and set variables to be explored on Log/Linear scale as appropriate.
+
 ```python
 %%time
 
@@ -370,3 +372,64 @@ while status != "Completed" and status != "Failed":
     status = client.describe_hyper_parameter_tuning_job(HyperParameterTuningJobName=job_name)["HyperParameterTuningJobStatus"]
     print(status)
 ```
+
+### Distributed Training
+
+Unnecessary in this toy example due to the small data size (it actually takes much longer to train). Over time if our dataset size grew considerably we could enable Distributed training by increasing our instance count as appropriate. This is algorithm dependent as we can also scale the instance type vertically.
+
+Due to quota issues on the number of spot instances I can run on my account (20) I set this to 2 as below. I learnt that of course the number of parallel hyper parameters jobs and the instance count are multiplied to calculate this number 
+
+$$ Max Spot instance quota = (Parallel Hyper parameter jobs * Instance Count) = 10 * 2 = 20.$$
+
+```
+create_training_params = {
+    "AlgorithmSpecification": {"TrainingImage": container, "TrainingInputMode": "Pipe"},
+    "RoleArn": role,
+    "OutputDataConfig": {
+        "S3OutputPath": f"{output_bucket_path}/{output_prefix}/hyper-xgboost"
+    },
+    ### SET BELOW
+    "ResourceConfig": {"InstanceCount": 2, "InstanceType": "ml.m5.large", "VolumeSizeInGB": 5},
+    "StaticHyperParameters": {
+        "objective": "reg:squarederror",
+        "num_round": "120",
+    },
+    "StoppingCondition": {"MaxRuntimeInSeconds": 7200},
+    "InputDataConfig": [
+        {
+            "ChannelName": "train",
+            "DataSource": {
+                "S3DataSource": {
+                    "S3DataType": "S3Prefix",
+                    "S3Uri": f"{data_bucket_path}/{data_prefix}/{train_prefix}",
+                    "S3DataDistributionType": "FullyReplicated",
+                }
+            },
+            "ContentType": "text/csv",
+            "CompressionType": "Gzip",
+        },
+        {
+            "ChannelName": "validation",
+            "DataSource": {
+                "S3DataSource": {
+                    "S3DataType": "S3Prefix",
+                    "S3Uri": f"{data_bucket_path}/{data_prefix}/{eval_prefix}",
+                    "S3DataDistributionType": "FullyReplicated",
+                }
+            },
+            "ContentType": "text/csv",
+            "CompressionType": "Gzip",
+        },
+    ],
+    "StoppingCondition" : {
+            "MaxWaitTimeInSeconds": 400,
+            "MaxRuntimeInSeconds": 400,
+    },
+    "EnableManagedSpotTraining" : True,
+    "CheckpointConfig" : {
+            "S3Uri" : f"{output_bucket_path}/{snapshot_prefix}",
+    }
+}
+```
+
+
