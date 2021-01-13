@@ -1,6 +1,6 @@
 # AWS Blackbelt CMAPPSS dataset ML Capstone project
 
-See (writeup)[writeup.md] for detailed breakdown of project delivery.
+See [ writeup ]( writeup.md ) for detailed breakdown of project delivery.
 
 ## Getting started
 
