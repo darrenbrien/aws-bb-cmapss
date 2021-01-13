@@ -1,8 +1,6 @@
 # Data Visualisation
-<details>
-    <Summary>Click to expand</summary>
 
-An initial EDA was performed on the data to understand the dataset and relationships between the exogenous and endogenous (RUL) variables, this informed the approach described so far and worked with the entire (small ~30Mb) dataset. In a production scenario the dataset could be representatively sampled to achieve a similar insights to be achieved.
+An initial EDA was performed on the data to understand the dataset and relationships between the exogenous and endogenous (RUL) variables, this informed the approach described so far and worked with the entire (small ~30Mb) dataset. In a production scenario the dataset could be representatively sampled to achieve a similar insights to be achieved. We use the data processed from our data preparation step in glue, saved in parquet format to S3. Our Analysis is run a SageMaker notebook, our Sagemaker notebook role only has read access to this s3 bucket and so cannot change the data, this ensures no inadvertent changes to the data are made and means we can carry forward an observations to our ML approach subsequently.
 
 A quick look at 5 rows in the dataset to understand the columns and datatypes
 
@@ -499,6 +497,8 @@ _ = plt.axvline(x=df.groupby('unit_number').cycle.max().mean())
 ```
     
 ![png](../images/eda_7_0.png)
+
+### Operational Settings
     
 The documentation explains the columns settings 1,2 and 3 vary between files and represent different settings the engines were configured at before cycles were run, here we explore to relationship between the target variable, failure cycle, and each operational setting
 ```python
@@ -516,7 +516,11 @@ sns.jointplot(x='op_3', y='failure_cycle', data=df.sample(10000))
 
 The distribution of operational settings is multi modal, and infact varies between the files.
 
-Looking at the other 20 sensor measurements we can see how measurments vary between unique unit numbers across cycles and files, there are some clear trends across many of the variables as cycles increase which seems to represent changes due to wear and tear, this insight indicates these features provide information our model can leverage to predict RUL.
+### Sensor measurements
+
+Looking at the other 20 sensor measurements we can see how measurements vary between unique unit numbers across cycles and files, there are some clear trends across many of the variables as cycles increase which seems to represent changes due to wear and tear, this insight indicates these features provide information our model can leverage to predict RUL.
+
+The training data for files 2 and 4 have 6 different operational settings and we can see how this effects the measurements, as files 2 and 4 have several operational settings where as files 1 and 3 have individual settings we can see that operational setting and some of the sensor measurements interact, resulting in the difference between the plots (clear non linear trends vs noisy plots).
     
 File 1
 ```python
@@ -563,8 +567,9 @@ for i, a in zip(range(1, 22), axes):
     a.set_xlabel('cycle')
 ```
 
-The training data for 2 and 4 have 6 different operational settings and we can see how this effects the measurements, as files 2 and 4 have several operational settings where as files 1 and 3 have individual settings we can see that operational setting and some of the sensor measurements interact, resulting in the difference between the plots (clear non linear trends vs noisy plots).
 ![png](../images/eda_18_0.png)
+
+### Minimum viable model
 
 Given the above an ensemble model may be an appropriate approach as the data exhibits non linear effects and has clear interactions between the exogenous variables which a tree based method can discover. 
 
@@ -612,7 +617,13 @@ RMSE
     46.4291275009693
 A root mean squared error of ~46 cycles
 
-Which features does this model find most useful
+Which features does this model find most useful based on the model frequent feature which the trees are split on.
+1. Cycle number (makes intuitive sense, the more cycles a engine has completed the fewer we expect will be required before a failure)
+2. sensor_measurement 11
+3. sensor_measurement 13
+4. sensor_measurement 15
+The model appears to have discovered patterns in the data and predictions aren't entirely dominated by any single feature.
+
 ```python
 fig, ax = plt.subplots(figsize=(30, 20))
 ax.barh(features, cls.feature_importances_)
@@ -621,6 +632,8 @@ ax.barh(features, cls.feature_importances_)
 ![png](../images/eda_31_1.png)
     
 ### Baseline mean regressor
+
+It's useful to establish how good are MVM is before proceeding, at the very least we'd hope to do better than a naive guess. The sklearn dummyregressor provides a model which ignores all features (exogenous data) and makes a prediction entirely based on the our target (endogenous) column (specifically its mean) 
 
 
 ```python
@@ -634,13 +647,16 @@ RMSE
 
     81.9091606758585
 
-An ensemble based method outperforms a niave mean prediction by ~50% 
+An ensemble based method outperforms a naive mean prediction by ~50%.
+* This approach validates the potential value before we commit to building a sagemaker model, ie if there wasn't a margin over our "dummy" model then building a sagemaker model may be a waste of our time. 
+* We've validated the processed data lines appropriately and can be used predictively.
 * Next steps apply Xgboost, gradient boosting generally outperforms random forest when tuned appropriately
-* This approach validates the potential value before we commit to building a sagemaker model, ie if there wasn't a margin over out "dummy" model then building a sagemaker model wouldn't probably be fruitful. 
 
 ### Quicksight dashboard
 
-A quicksight dashboard to enable insight into the distribution of features in the dataset to aid debugging the model as new data arrives
+A quicksight dashboard to enable insight into the distribution of features in the dataset to aid debugging the model as new data arrives.
+A use case for this dashboard would be to provide insight into new data arriving to understand any human discernible patterns.
+This dashboard leverages AWS Athena to query the same data as analysed in our EDA above. As can be seen the visualisations capture the different ranges of values observed across the dataset files and would provide clear oversight of data processed and available in the data lake.
 
 ![png](../images/qs_1.png)
 <br/>*Dashboard after first training data file has been published.*
@@ -648,6 +664,4 @@ A quicksight dashboard to enable insight into the distribution of features in th
 <br/>*Dashboard after first and second training data files have been published, note the change in the distribution of some features and operational settings.*
 ![png](../images/qs_3.png)
 <br/>*Dashboard after all training data files have been published.*
-
-</details>
 
