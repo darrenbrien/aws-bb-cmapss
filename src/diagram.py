@@ -11,6 +11,7 @@ from diagrams.aws.analytics import (
     KinesisDataFirehose,
     Kinesis,
     EMR,
+    Quicksight,
 )
 from diagrams.aws.ml import SagemakerNotebook, SagemakerTrainingJob, SagemakerModel
 
@@ -18,7 +19,7 @@ with Diagram("AWS ML Lab", show=False):
     iot = IotRule("Engine devices")
     inference = Kinesis("real-time")
     source = KinesisDataFirehose("batches")
-
+    quicksight = Quicksight("dashboard")
     with Cluster("VPC"):
         with Cluster("Training"):
             submissions = S3("Submissions")
@@ -51,12 +52,9 @@ with Diagram("AWS ML Lab", show=False):
     source >> submissions >> submissions_crawler >> curated_crawler >> curated
     submissions >> catalog
     iot >> inference >> source
-
     curated >> ctas >> [catalog, job]
-
     notebooks >> job >> model
-
     model >> endpoints >> published >> monitor_sched
-
     inference >> endpointLambda >> endpoints
     monitor_sched >> job
+    catalog >> quicksight
