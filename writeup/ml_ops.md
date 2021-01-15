@@ -28,6 +28,191 @@ Each role has permissions sufficient only to access data/services required for t
 
 ![](../images/iam.png)
 
+## Model Monitoring
+
+Model monitoring allows us to ensure the training data and inference data exhibit similar data distributions and provides a mechanism to alert us when our model requires retraining.
+As the data for this project exhibits distributional difference between the data files 1,2,3,4 this enables us to:
+
+1. Train a model on our initial data/train_FD001.txt
+2. Make inferences on data/test_FD001.txt, as these two files exhibit similar data distributions no alerts are raised
+3. Make inferences on data/test_FD002.txt, as these two files exhibit different data distributions alerts are raised
+4. Raise an alert via email which enables us to retrain the model
+  * Could be automated to retrain the model however from experience this creates more issues than it solves in all but the most trivial of datasets. 
+
+![](../images/cw_alert.png)
+
+To achieve this we require a couple of changes.
+
+1. Enable data capture on endpoint
+2. Create a baseline job to calculate statistics of the dataset and set baseline constraints
+3. Schedule job to run periodically and alert on constraint violations based on the inference data
+
+
+### Enable Amazon SageMaker Model Monitor
+
+As we have an existing inference endpoint we need to update the configuration to enable data capture.
+
+# Enable real-time inference data capture
+
+![](../images/capture_endpoint.png)
+
+```python
+# Please fill in the following for enabling data capture
+endpoint_name = 'cmapss-XGBoostEndpoint-2021-01-14-14-57-30'
+s3_capture_upload_path = 's3://datalake-published-data-907317471167-us-east-1-pjkrtzr/model-monitor'
+```
+
+
+```python
+data_bucket = f"datalake-published-data-907317471167-us-east-1-pjkrtzr"
+data_prefix = "cmaps-ml"
+train_prefix = "split=train/year=2021"
+eval_prefix = "split=validation/year=2021"
+data_bucket_path = f"s3://{data_bucket}"
+output_prefix = "sagemaker/cmapss-xgboost"
+snapshot_prefix = "model_snapshots"
+output_bucket_path = f"s3://{data_bucket}"
+```
+
+
+```python
+import sagemaker
+import boto3
+role = sagemaker.get_execution_role()
+region = boto3.Session().region_name
+client = boto3.client("sagemaker", region_name=region)
+```
+
+
+```python
+from sagemaker.model_monitor import DataCaptureConfig
+from sagemaker.predictor import Predictor as RealTimePredictor
+from sagemaker import session
+import boto3
+sm_session = session.Session(boto3.Session())
+
+# Change parameters as you would like - adjust sampling percentage, 
+#  chose to capture request or response or both.
+#  Learn more from our documentation
+data_capture_config = DataCaptureConfig(enable_capture = True,
+                                        sampling_percentage=100,
+                                        destination_s3_uri=s3_capture_upload_path)
+
+# Now it is time to apply the new configuration and wait for it to be applied
+predictor = RealTimePredictor(endpoint_name=endpoint_name)
+predictor.update_data_capture_config(data_capture_config=data_capture_config)
+sm_session.wait_for_endpoint(endpoint=endpoint_name)
+```
+    {'EndpointName': 'cmapss-XGBoostEndpoint-2021-01-14-14-57-30',
+     'EndpointArn': 'arn:aws:sagemaker:us-east-1:907317471167:endpoint/cmapss-xgboostendpoint-2021-01-14-14-57-30',
+     'EndpointConfigName': 'cmapss-XGBoostEndpoint-2021-01-14-14-57-2021-01-14-18-28-22-124',
+     'ProductionVariants': [{'VariantName': 'AllTraffic',
+       'DeployedImages': [{'SpecifiedImage': '683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-xgboost:1.2-1',
+         'ResolvedImage': '683313688378.dkr.ecr.us-east-1.amazonaws.com/sagemaker-xgboost@sha256:cd8ab9e949aaa591ca914d9a4513d801e10e3fcc575f068154886b3c8930b7e8',
+         'ResolutionTime': datetime.datetime(2021, 1, 14, 18, 28, 25, 443000, tzinfo=tzlocal())}],
+       'CurrentWeight': 1.0,
+       'DesiredWeight': 1.0,
+       'CurrentInstanceCount': 1,
+       'DesiredInstanceCount': 1}],
+     'DataCaptureConfig': {'EnableCapture': True,
+      'CaptureStatus': 'Started',
+      'CurrentSamplingPercentage': 50,
+      'DestinationS3Uri': 's3://datalake-published-data-907317471167-us-east-1-pjkrtzr/model-monitor'},
+     'EndpointStatus': 'InService',
+     'CreationTime': datetime.datetime(2021, 1, 14, 14, 57, 30, 958000, tzinfo=tzlocal()),
+     'LastModifiedTime': datetime.datetime(2021, 1, 14, 18, 35, 46, 689000, tzinfo=tzlocal()),
+     'ResponseMetadata': {'RequestId': 'ee033cc0-3d08-4e7a-93f1-2b35c3015e61',
+      'HTTPStatusCode': 200,
+      'HTTPHeaders': {'x-amzn-requestid': 'ee033cc0-3d08-4e7a-93f1-2b35c3015e61',
+       'content-type': 'application/x-amz-json-1.1',
+       'content-length': '987',
+       'date': 'Thu, 14 Jan 2021 18:35:54 GMT'},
+      'RetryAttempts': 0}}
+
+
+### Step 2: Model Monitor - Baselining
+
+## Constraint suggestion with baseline/training dataset
+
+The training dataset with which you trained the model is usually a good baseline dataset. Note that the training dataset's data schema and the inference dataset schema should exactly match (i.e. number and order of the features).
+
+Using our training dataset, we'll ask SageMaker to suggest a set of baseline constraints and generate descriptive statistics to explore the data.
+
+```python
+baseline_data_uri = f"{data_bucket_path}/{data_prefix}/{train_prefix}" 
+baseline_results_uri = f"{data_bucket_path}/baseline_results" 
+
+print('Baseline data uri: {}'.format(baseline_data_uri))
+print('Baseline results uri: {}'.format(baseline_results_uri))
+```
+
+    Baseline data uri: s3://datalake-published-data-907317471167-us-east-1-pjkrtzr/cmaps-ml/split=train/year=2021
+    Baseline results uri: s3://datalake-published-data-907317471167-us-east-1-pjkrtzr/baseline_results
+
+
+### Create a baselining job with the training dataset
+
+Now that we have the training data ready in S3, let's kick off a job to `suggest` constraints. `DefaultModelMonitor.suggest_baseline(..)` kicks off a `ProcessingJob` using a SageMaker provided Model Monitor container to generate the constraints.
+
+```python
+from sagemaker.model_monitor import DefaultModelMonitor
+from sagemaker.model_monitor.dataset_format import DatasetFormat
+
+my_default_monitor = DefaultModelMonitor(
+    role=role,
+    instance_count=1,
+    instance_type='ml.m5.large',
+    volume_size_in_gb=5,
+    max_runtime_in_seconds=3600,
+)
+
+my_default_monitor.suggest_baseline(
+    baseline_dataset='monitor_data.csv',
+    dataset_format=DatasetFormat.csv(header=True),
+    output_s3_uri=baseline_results_uri,
+    wait=True
+)
+```
+
+    
+    Job Name:  baseline-suggestion-job-2021-01-14-22-22-39-114
+    Inputs:  [{'InputName': 'baseline_dataset_input', 'S3Input': {'S3Uri': 's3://sagemaker-us-east-1-907317471167/model-monitor/baselining/baseline-suggestion-job-2021-01-14-22-22-39-114/input/baseline_dataset_input', 'LocalPath': '/opt/ml/processing/input/baseline_dataset_input', 'S3DataType': 'S3Prefix', 'S3InputMode': 'File', 'S3DataDistributionType': 'FullyReplicated', 'S3CompressionType': 'None'}}]
+    Outputs:  [{'OutputName': 'monitoring_output', 'S3Output': {'S3Uri': 's3://datalake-published-data-907317471167-us-east-1-pjkrtzr/baseline_results', 'LocalPath': '/opt/ml/processing/output', 'S3UploadMode': 'EndOfJob'}}]
+    .................
+
+
+### Create a schedule
+
+We are ready to create a model monitoring schedule for the Endpoint created earlier with the baseline resources (constraints and statistics).
+
+
+```python
+from sagemaker.model_monitor import CronExpressionGenerator
+from time import gmtime, strftime
+
+mon_schedule_name = 'scheduled-monitor-report'
+s3_report_path = f"{data_bucket_path}/monitoring-report" 
+
+my_default_monitor.create_monitoring_schedule(
+    monitor_schedule_name=mon_schedule_name,
+    endpoint_input=predictor.endpoint_name,
+    output_s3_uri=s3_report_path,
+    statistics=my_default_monitor.baseline_statistics(),
+    constraints=my_default_monitor.suggested_constraints(),
+    schedule_cron_expression=CronExpressionGenerator.hourly(),
+    enable_cloudwatch_metrics=True,
+)
+```
+
+### Send requests to endpoint which will generate constraint violations
+
+* We generate some data with the same schema as our training data but a different distribution and observe several violations in the subsequent hourly monitoring job
+
+![](../images/violations_job.png)
+
+* As we enabled cloud watch metrics we see these alerts in the cloud watch console
+
+![](../images/cloudwatch_violations.png)
 
 ## Model endpoint setup
 
